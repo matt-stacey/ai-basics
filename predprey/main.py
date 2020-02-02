@@ -7,7 +7,7 @@ import time
 import random
 import os
 
-import resources.colors as clr
+import resources.colors as colors
 from resources.mobs import Predator, Prey, Food
 
 pygame.init()
@@ -24,7 +24,7 @@ clock = pygame.time.Clock()
 FPS = 30
 
 
-def init_mobs(food=0, prey=0, pred=0):
+def init_mobs(food=0, prey=(0, False), pred=(0, False)):
     mobs = {'food': [],
             'prey': [],
             'predator': [],
@@ -36,15 +36,15 @@ def init_mobs(food=0, prey=0, pred=0):
         y = random.randint(0, HEIGHT)
         mobs['food'].append(Food(x=x, y=y, dims=dims))
     
-    for p in range(prey):
+    for p in range(prey[0]):
         x = random.randint(0, WIDTH)
         y = random.randint(0, HEIGHT)
-        mobs['prey'].append(Prey(x=x, y=y, dims=dims))
+        mobs['prey'].append(Prey(x=x, y=y, dims=dims, load=prey[1]))
     
-    for p in range(pred):
+    for p in range(pred[0]):
         x = random.randint(0, WIDTH)
         y = random.randint(0, HEIGHT)
-        mobs['predator'].append(Predator(x=x, y=y, dims=dims))
+        mobs['predator'].append(Predator(x=x, y=y, dims=dims, load=pred[1]))
     
     return mobs
 
@@ -52,7 +52,7 @@ def init_mobs(food=0, prey=0, pred=0):
 def display_stats():
     font = pygame.font.SysFont(None, 32)
     message = 'statistics'
-    text = font.render(message, True, clr.white)
+    text = font.render(message, True, colors.white)
     gameDisplay.blit(text,(0, 0))
 
 
@@ -68,12 +68,12 @@ def exit_sim():
 
 def run():
     
-    mobs = init_mobs(food=40, prey=5, pred=1)
+    mobs = init_mobs(food=40, prey=(5, False), pred=(1, False))
     
-    SEC = 5
+    SEC = 10
     
     for k in range(SEC * FPS):
-        gameDisplay.fill(clr.black)
+        gameDisplay.fill(colors.black)
         
         # update and display all mobs
         for mob_type, list in mobs.items():

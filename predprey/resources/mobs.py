@@ -1,12 +1,13 @@
 import random
 import math
 import numpy as np
-
+'''
 try:
     import pygame_sdl2
     pygame_sdl2.import_as_pygame()
 except ImportError:
     pass
+'''
 import pygame
 
 
@@ -34,7 +35,7 @@ class Q_table():
         self.ranges = (0, r /4, r / 2, r * 3 / 4, r)
         
         if load:
-            pass  # FIXME pickle in and out
+            self.table = self.q_table_setup()  # FIXME pickle in
         else:
             self.table = self.q_table_setup()
         
@@ -57,10 +58,13 @@ class Q_table():
         
         return table
 
+    def save(self):
+        pass  # FIXME pickle out
+
 
 class Mob():
     def __init__(self, x=None, y=None, dims=None):
-        if not x or not y:
+        if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
             raise ValueError('Mob not passed position in init!')
         self.x = x
         self.y = y
@@ -156,8 +160,9 @@ class Mob():
     def display(self, gameDisplay=None):
         if gameDisplay:
             # show current location
-            pygame.draw.circle(gameDisplay, self.color, (self.x, self.y), self.r)  # physical
-            pygame.draw.circle(gameDisplay, self.color, (self.x, self.y), self.sight, width=1)  # sight range
+            pygame.draw.ellipse(gameDisplay, self.color, (self.x - self.r, self.y - self.r, self.r * 2, self.r * 2))  # physical
+            if self.sight >= 1:
+                pygame.draw.ellipse(gameDisplay, self.color, (self.x - self.sight, self.y - self.sight, self.sight * 2, self.sight * 2), 1)  # sight range
             
             # show move history
             if self.show_moves:
@@ -168,8 +173,8 @@ class Mob():
                 else:
                     start = len(self.moves) - self.show_moves
                 for pt in range(start, len(self.moves) - 1):
-                    pygame.draw.line(gameDisplay, self.color, self.moves[pt], self.moves[pt+1], width=1)
-                pygame.draw.line(gameDisplay, self.color, self.moves[-1], (self.x, self.y), width=1)
+                    pygame.draw.line(gameDisplay, self.color, self.moves[pt], self.moves[pt+1], 1)
+                pygame.draw.line(gameDisplay, self.color, self.moves[-1], (self.x, self.y), 1)
         
         else:
             raise RuntimeError('Error drawing {}'.format(self.__class__))
@@ -177,7 +182,7 @@ class Mob():
 
 class Food(Mob):
     def __init__(self, x=None, y=None, dims=None):
-        if not x or not y:
+        if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
             raise ValueError('Food not passed position in init!')
         if dims and isinstance(dims, (list, tuple)):
             super().__init__(x=x, y=y, dims=dims)
@@ -190,8 +195,8 @@ class Food(Mob):
 
 
 class Prey(Mob):
-    def __init__(self, x=None, y=None, dims=None):
-        if not x or not y:
+    def __init__(self, x=None, y=None, dims=None, load=False):
+        if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
             raise ValueError('Prey not passed position in init!')
         if dims and isinstance(dims, (list, tuple)):
             super().__init__(x=x, y=y, dims=dims)
@@ -213,12 +218,15 @@ class Prey(Mob):
         self.learning_rate = 0.08
         self.discount = 0.67
         
-        self.q_table = Q_table(r=self.sight, slices=8)
+        if not load:
+            self.q_table = Q_table(r=self.sight, slices=8)
+        else:
+            self.q_table = Q_table(load=load)
 
 
 class Predator(Mob):
-    def __init__(self, x=None, y=None, dims=None):
-        if not x or not y:
+    def __init__(self, x=None, y=None, dims=None, load=False):
+        if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
             raise ValueError('Predator not passed position in init!')
         if dims and isinstance(dims, (list, tuple)):
             super().__init__(x=x, y=y, dims=dims)
@@ -239,7 +247,10 @@ class Predator(Mob):
         self.learning_rate = 0.12  # faster learner
         self.discount = 0.95  # with better time pref than prey
         
-        self.q_table = Q_table(r=self.sight, slices=16)
+        if not load:
+            self.q_table = Q_table(r=self.sight, slices=16)
+        else:
+            pass  # FIXME pickle in
         
         self.log = open('resources/pred.log', 'w')
         self.log.write('{}\n'.format(self.q_table.table))
