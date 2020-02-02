@@ -15,8 +15,8 @@ pygame.init()
 RES = 'resources'
 LOG = open(os.path.join(RES, 'game.log'), 'w')
 
-WIDTH = 1080
-HEIGHT = 800
+WIDTH = 400
+HEIGHT = 400
 
 gameDisplay = pygame.display.set_mode((WIDTH, HEIGHT))
 
@@ -68,25 +68,21 @@ def exit_sim():
 
 def run():
     
-    food = 100
-    prey = 5
-    pred = 1
+    mobs = init_mobs(food=40, prey=5, pred=1)
     
-    mobs = init_mobs(food=food, prey=prey, pred=pred)
-    
-    SEC = 10
+    SEC = 5
     
     for k in range(SEC * FPS):
-        # update all mobs
-        for mob_type, list in mobs.items():
-            for mob in list:
-                mob.action(random.randint(0, 16))
-        
-        # display all mobs
         gameDisplay.fill(clr.black)
+        
+        # update and display all mobs
         for mob_type, list in mobs.items():
             for mob in list:
-                mob.display(gameDisplay)
+                if mob.alive:
+                    mob.action(random.randint(0, 16))
+                    mob.display(gameDisplay)
+                else:
+                    pass  # poppable?
         
         # complete the render and wait to cycle
         display_stats()
