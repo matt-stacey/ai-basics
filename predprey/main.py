@@ -60,10 +60,10 @@ def exit_sim():
     fade_out = 1
     pygame.mixer.music.fadeout(fade_out * 1000)
     LOG.write('\nExiting normally!\n')
-    LOG.close()
+    #LOG.close()
     time.sleep(fade_out)
     pygame.quit()
-    quit()
+    #quit()
 
 
 def run():
@@ -95,4 +95,14 @@ def main():
     exit_sim()
 
 if __name__ == '__main__':
-    main()
+    import traceback
+    try:
+        main()
+    except Exception as e:
+        LOG.write('{}\n'.format(e))
+        tb = traceback.format_exc()
+    else:
+        tb = 'no error'
+    finally:
+        LOG.write('{}\n'.format(tb))
+        LOG.close()
