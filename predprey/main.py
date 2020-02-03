@@ -6,6 +6,7 @@ import pygame
 import time
 import random
 import os
+import numpy as np
 
 import resources.colors as colors
 from resources.mobs import Predator, Prey, Food
@@ -59,7 +60,7 @@ def display_stats(episode, mobs):
         tally = 0
         total = len(mobs[key])
         for mob in mobs[key]:
-            tally = tally + 1 if mob.alive else tally
+            tally = tally + 1 if mob.alive else tally  # FIXME add rewards (avg?)
         message = '{}: {}/{}'.format(key, tally, total)
         text = font.render(message, True, colors.white)
         gameDisplay.blit(text,(0, (num+1)*40))
@@ -78,13 +79,17 @@ def exit_sim():
 def run():
     
     mobs = init_mobs(food=40, prey=(5, False), pred=(1, False))
-    
+
+    # FIXME
+    # tally up all episode rewards so we can graph them for each mob 'brain'
+
+
     SEC = 7
     
     for episode in range(EPISODES):
         show_this = True if episode % SHOW == 0 else False
         
-        # reset all the mobs for this elisode
+        # reset all the mobs for this episode
         for mob_type, mob_list in mobs.items():
             for mob in mob_list:
                 x = random.randint(0, WIDTH)
@@ -99,7 +104,12 @@ def run():
             for mob_type, mob_list in mobs.items():
                 for mob in mob_list:
                     if mob.alive:
-                        mob.action(random.randint(0, 16))
+
+                        mob.observe(mobs)  # find the closest food/prey/predator
+                        mob.action(epsilon=0, observation=None)  # take an action
+                        mob.check(mobs)  # check to see what has happened
+                        mob.update_q()  # learn from what mob did
+
                         if show_this:
                             mob.display(gameDisplay)
                     else:
@@ -110,6 +120,8 @@ def run():
             pygame.display.update()
             if show_this:
                 clock.tick(FPS)  # no need to wait if we aren't visualizing
+
+        # clean up the episode
 
 
 def main():

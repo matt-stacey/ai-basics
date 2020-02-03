@@ -63,7 +63,7 @@ class Q_table():
 
     def save(self):
         pass  # FIXME pickle out
-        #with open('{}-{}.Q'.format(self.__class__, int(time.time())), 'wb') as f:
+        #with open('{}-{}.Q'.format(self.__class__, int(time.time() * 10**6)), 'wb') as f:  # microseconds
             #pickle.dump(self.table, f)
 
 
@@ -82,6 +82,7 @@ class Mob():
             raise ValueError('No app dimensions passed to mob!')
         
         self.alive = True
+        self.serial = int(time.time() * 10**6) % (10**7)
         
         self.target = None
         self.flee = None
@@ -98,7 +99,7 @@ class Mob():
         self.discount = 0  # 0: no time preference, 1: infinite time preference
         
         self.q_table = None
-    
+        
     def reset(self, x=None, y=None):
         if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
             raise ValueError('Mob not passed position in init!')
@@ -110,13 +111,21 @@ class Mob():
         
     def __str__(self):
         return '{} at ({}, {})'.format(self.__class__, self.x, self.y)
-    
-    def action(self, choice=0):
+        
+    def observe(self, mobs=None):
+        pass
+
+    def action(self, epsilon=0, observation=None):
+        if random.random() > epsilon:
+            choice = random.randint(0,16)  # np.argmax
+        else:
+            choice = random.randint(0,16)
+
         # 17 possible actions: move in 8 inter/cardinal directions, at wander/run pace
         # 0 is hold
         # 1 is north/wander, clockwise to 8
         # 9 is north/run, clockwise to 16
-        
+
         # north/south component
         if choice in (8, 1, 2, 16, 9, 10):
             dx = -1  # flipped for pixels!
@@ -143,8 +152,8 @@ class Mob():
             dy *= self.speed[0]
             
         mx, my = self.move(dx=dx, dy=dy, run=run)
-        return choice, mx, my
-    
+        return (choice, mx, my)
+        
     def move(self, dx=None, dy=None, run=False):
         dx = dx if isinstance(dx, int) else random.randint(0, self.speed[1])
         dy = dy if isinstance(dy, int) else random.randint(0, self.speed[1])
@@ -166,11 +175,18 @@ class Mob():
         self.y += my
         
         self.moves.append((self.x, self.y))
+        self.reward -= (mx**2 + my**2)  # 1/2mv**2: moving further costs exponentially
         return (mx, my)
-    
+        
+    def check(self, mobs=None):
+        pass
+
+    def update_q(self):
+        pass
+
     def __sub__(self, other):
         return (self.x - other.x, self.y - other.y)
-    
+        
     def display(self, gameDisplay=None):
         if gameDisplay:
             # show current location
@@ -210,10 +226,9 @@ class Food(Mob):
             raise ValueError('No app dimensions passed to Food!')
         
         self.r = 2
-        self.reward = 20
         self.color = (0, 255, 0)
         
-    def action(self, choice=0):
+    def action(self, epsilon=0, observation=None):
         self.reward += 1  # grow!
 
 
@@ -230,7 +245,6 @@ class Prey(Mob):
         
         self.target = Food
         self.flee = Predator
-        self.reward = 100
         
         self.sight = 50
         self.speed = (2, 6)  # wander, run
@@ -273,13 +287,14 @@ class Predator(Mob):
         if not load:
             self.q_table = Q_table(r=self.sight, slices=16)
         else:
-            pass  # FIXME pickle in
+            self.q_table = Q_table(load=load)
         
         self.log = open('resources/pred.log', 'w')
         self.log.write('{}\n'.format(self.q_table.table))
 
-    def action(self, choice=0):
+    def action(self, epsilon=0, observation=None):
         # movement logging for debugging
-        choice, mx, my = super().action(choice=choice)
+        choice, mx, my = super().action(epsilon=epsilon, observation=observation)
         if self.log:
             self.log.write('choice: {:<2}  |  move: ({:>6}, {:>6})  |  ds = {}\n'.format(choice, round(mx, 2), round(my, 2), round((mx**2 +my**2)**.5, 2)))
+
