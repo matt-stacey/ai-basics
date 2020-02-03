@@ -12,16 +12,22 @@ from resources.mobs import Predator, Prey, Food
 
 pygame.init()
 
+# resources
 RES = 'resources'
 LOG = open(os.path.join(RES, 'game.log'), 'w')
 
-WIDTH = 400
-HEIGHT = 400
-
+# pygame setup
+WIDTH = 400  # 1080
+HEIGHT = 400  # 800
 gameDisplay = pygame.display.set_mode((WIDTH, HEIGHT))
-
 clock = pygame.time.Clock()
 FPS = 30
+
+# Q learning variablea
+EPISODES = 20000
+SHOW = 1  # how often to visualize
+epsilon = 0.9  # random action threshhold
+DECAY_RATE = 0.9998  # espilon *= DECAY_RATE
 
 
 def init_mobs(food=0, prey=(0, False), pred=(0, False)):
@@ -32,28 +38,31 @@ def init_mobs(food=0, prey=(0, False), pred=(0, False)):
     dims = (WIDTH, HEIGHT)
     
     for f in range(food):
-        x = random.randint(0, WIDTH)
-        y = random.randint(0, HEIGHT)
-        mobs['food'].append(Food(x=x, y=y, dims=dims))
+        mobs['food'].append(Food(x=0, y=0, dims=dims))
     
     for p in range(prey[0]):
-        x = random.randint(0, WIDTH)
-        y = random.randint(0, HEIGHT)
-        mobs['prey'].append(Prey(x=x, y=y, dims=dims, load=prey[1]))
+        mobs['prey'].append(Prey(x=0, y=0, dims=dims, load=prey[1]))
     
     for p in range(pred[0]):
-        x = random.randint(0, WIDTH)
-        y = random.randint(0, HEIGHT)
-        mobs['predator'].append(Predator(x=x, y=y, dims=dims, load=pred[1]))
+        mobs['predator'].append(Predator(x=0, y=0, dims=dims, load=pred[1]))
     
     return mobs
 
 
-def display_stats():
+def display_stats(episode, mobs):
     font = pygame.font.SysFont(None, 32)
-    message = 'statistics'
-    text = font.render(message, True, colors.white)
+    
+    text = font.render('episode: {}'.format(episode), True, colors.white)
     gameDisplay.blit(text,(0, 0))
+    
+    for num, key in enumerate(mobs.keys()):
+        tally = 0
+        total = len(mobs[key])
+        for mob in mobs[key]:
+            tally = tally + 1 if mob.alive else tally
+        message = '{}: {}/{}'.format(key, tally, total)
+        text = font.render(message, True, colors.white)
+        gameDisplay.blit(text,(0, (num+1)*40))
 
 
 def exit_sim():
@@ -70,24 +79,37 @@ def run():
     
     mobs = init_mobs(food=40, prey=(5, False), pred=(1, False))
     
-    SEC = 10
+    SEC = 7
     
-    for k in range(SEC * FPS):
-        gameDisplay.fill(colors.black)
+    for episode in range(EPISODES):
+        show_this = True if episode % SHOW == 0 else False
         
-        # update and display all mobs
-        for mob_type, list in mobs.items():
-            for mob in list:
-                if mob.alive:
-                    mob.action(random.randint(0, 16))
-                    mob.display(gameDisplay)
-                else:
-                    pass  # poppable?
+        # reset all the mobs for this elisode
+        for mob_type, mob_list in mobs.items():
+            for mob in mob_list:
+                x = random.randint(0, WIDTH)
+                y = random.randint(0, HEIGHT)
+                mob.reset(x=x, y=y)
         
-        # complete the render and wait to cycle
-        display_stats()
-        pygame.display.update()
-        clock.tick(FPS)
+        # run the episode
+        for k in range(SEC * FPS):
+            gameDisplay.fill(colors.black)
+            
+            # update and display all mobs
+            for mob_type, mob_list in mobs.items():
+                for mob in mob_list:
+                    if mob.alive:
+                        mob.action(random.randint(0, 16))
+                        if show_this:
+                            mob.display(gameDisplay)
+                    else:
+                        pass  # poppable?
+            
+            # complete the render and wait to cycle
+            display_stats(episode, mobs)
+            pygame.display.update()
+            if show_this:
+                clock.tick(FPS)  # no need to wait if we aren't visualizing
 
 
 def main():
@@ -97,7 +119,7 @@ def main():
 if __name__ == '__main__':
     import traceback
     try:
-        main()
+        main()  # FIXME just run this
     except Exception as e:
         LOG.write('{}\n'.format(e))
         tb = traceback.format_exc()

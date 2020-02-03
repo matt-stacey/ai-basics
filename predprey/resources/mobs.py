@@ -1,13 +1,14 @@
 import random
 import math
 import numpy as np
-'''
+import pickle
+import time
+
 try:
     import pygame_sdl2
     pygame_sdl2.import_as_pygame()
 except ImportError:
     pass
-'''
 import pygame
 
 
@@ -36,6 +37,8 @@ class Q_table():
         
         if load:
             self.table = self.q_table_setup()  # FIXME pickle in
+            #with open(load, 'rb') as f:
+                #self.table = pickle.load(f)
         else:
             self.table = self.q_table_setup()
         
@@ -60,6 +63,8 @@ class Q_table():
 
     def save(self):
         pass  # FIXME pickle out
+        #with open('{}-{}.Q'.format(self.__class__, int(time.time())), 'wb') as f:
+            #pickle.dump(self.table, f)
 
 
 class Mob():
@@ -93,6 +98,15 @@ class Mob():
         self.discount = 0  # 0: no time preference, 1: infinite time preference
         
         self.q_table = None
+    
+    def reset(self, x=None, y=None):
+        if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
+            raise ValueError('Mob not passed position in init!')
+        self.x = x
+        self.y = y
+        
+        self.alive = True
+        self.moves = []
         
     def __str__(self):
         return '{} at ({}, {})'.format(self.__class__, self.x, self.y)
@@ -198,6 +212,9 @@ class Food(Mob):
         self.r = 2
         self.reward = 20
         self.color = (0, 255, 0)
+        
+    def action(self, choice=0):
+        self.reward += 1  # grow!
 
 
 class Prey(Mob):
