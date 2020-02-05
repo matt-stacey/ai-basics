@@ -24,11 +24,15 @@ gameDisplay = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 FPS = 30
 
-# Q learning variablea
+# Q learning variables
 EPISODES = 20000
 SHOW = 1  # how often to visualize
 epsilon = 0.9  # random action threshhold
 DECAY_RATE = 0.9998  # espilon *= DECAY_RATE
+
+# existing Q tables
+PREY_TABLE = False
+PRED_TABLE = False
 
 
 def init_mobs(food=0, prey=(0, False), pred=(0, False)):
@@ -78,11 +82,14 @@ def exit_sim():
 
 def run():
     
-    mobs = init_mobs(food=40, prey=(5, False), pred=(1, False))
+    mobs = init_mobs(food=40, prey=(5, PREY_TABLE), pred=(1, PRED_TABLE))
 
     # FIXME
     # tally up all episode rewards so we can graph them for each mob 'brain'
-
+    rewards = {}
+    for mob_type, mob_list in mobs.items():
+        for mob in mob_list:
+            rewards[(mob.__class__, mob.serial)] = []
 
     SEC = 7
     
@@ -105,8 +112,8 @@ def run():
                 for mob in mob_list:
                     if mob.alive:
 
-                        mob.observe(mobs)  # find the closest food/prey/predator
-                        mob.action(epsilon=0, observation=None)  # take an action
+                        observation = mob.observe(mobs)  # find the closest food/prey/predator
+                        mob.action(epsilon=epsilon, observation=observation)  # take an action
                         mob.check(mobs)  # check to see what has happened
                         mob.update_q()  # learn from what mob did
 

@@ -1,0 +1,12 @@
+unsupported format string passed to list.__format__
+Traceback (most recent call last):
+  File "/storage/emulated/0/Programming Projects/AI Basics/predprey/main.py", line 141, in <module>
+    main()  # FIXME just run this
+  File "/storage/emulated/0/Programming Projects/AI Basics/predprey/main.py", line 135, in main
+    run()
+  File "/storage/emulated/0/Programming Projects/AI Basics/predprey/main.py", line 115, in run
+    observation = mob.observe(mobs)  # find the closest food/prey/predator
+  File "/storage/emulated/0/Programming Projects/AI Basics/predprey/resources/mobs.py", line 378, in observe
+    self.log.write('target: {:<10}  | flee: {}'.format(self.target, self.flee))
+TypeError: unsupported format string passed to list.__format__
+

@@ -3,6 +3,7 @@ import math
 import numpy as np
 import pickle
 import time
+import resources.colors as colors
 
 try:
     import pygame_sdl2
@@ -12,58 +13,77 @@ except ImportError:
 import pygame
 
 
-def angle(x=None, y=None):
-    if not x or not y:
+def angle(coords=(0,0)):
+    if not isinstance(coords, (list, tuple)) or len(coords) < 2:
         return None
     
+    x, y = coords
+    
     r2d = 180 / np.pi
-    
     ang = np.arctan2(x, 0-y) * r2d
-    
-    while ang < 0:
-        ang += 360
-    while ang > 360:
-        ang -= 360
     
     return ang
 
 
+def distance(coords=(0,0)):
+    if not isinstance(coords, (list, tuple)) or len(coords) < 2:
+        return None
+    
+    return ((coords[0]**2)+(coords[1]**2)**0.5)
+
+
 class Q_table():
     
-    def __init__(self, r=0, slices=0, load=False):
+    def __init__(self, r=0, slices=0, actions=17, load=False):
         slices = int(slices) if slices >= 8 else 8  # at least 1 per move direction
-        self.theta = 360 / slices
-        self.ranges = (0, r /4, r / 2, r * 3 / 4, r)
+        theta = 360 / slices
+        half = theta / 2
+        
+        self.quads = [(i * theta - half, i * theta + half) for i in range(slices)]
+        self.ranges = [(r * i / 4, r * (i+1) / 4) for i in range(4)]
+        
+        self.angle_bounds = (self.quads[0][0], self.quads[-1][-1])
         
         if load:
-            self.table = self.q_table_setup()  # FIXME pickle in
+            self.table = self.q_table_setup(actions=actions)  # FIXME pickle in
             #with open(load, 'rb') as f:
                 #self.table = pickle.load(f)
         else:
-            self.table = self.q_table_setup()
+            self.table = self.q_table_setup(actions=actions)
         
-    def q_table_setup(self):
+    def q_table_setup(self, actions=1):
         table = {}
         
-        # keys will be tuples of [L, R) angles and [min, max) distance
-        half = self.theta / 2
+        # keys will be tuples of "quadrants" and range bands, which are stored as [L, R) angles and [min, max) distance respectively, for both a target and whatever is being fleed
+        angle_keys = [None] + list(range(len(self.quads)))
+        range_keys = [None] + list(range(len(self.ranges)))
         
-        start_angle = -half
-        L = start_angle
-        while L < start_angle + 359.9:  # slop for non
-            R = L + self.theta
-            for r in range(len(self.ranges) - 1):
-                angle_bounds = (L, R)
-                range_bounds = (self.ranges[r], self.ranges[r+1])
-                table[(angle_bounds, range_bounds)] = [np.random.uniform(-5, 0) for a in range(17)]  # for each action
-            
-            L = R
+        table = {((ta, tr), (fa, fr)): [np.random.uniform(-actions, 0) for i in range(actions)] for ta in angle_keys for tr in range_keys for fa in angle_keys for fr in range_keys}
         
         return table
-
-    def save(self):
+    
+    def get_quad(self, addrac):
+        theta = angle(addrac)
+        if theta == None:
+            return None
+        
+        if theta < self.angle_bounds[0]:
+            theta += 360
+        if theta >= self.angle_bounds[1]:
+            theta -= 360
+        
+        
+    
+    def get_range(self, addrac):
+        r = distance(addrac)
+        if r == None:
+            return None
+        
+        
+    
+    def save(self, serial):
         pass  # FIXME pickle out
-        #with open('{}-{}.Q'.format(self.__class__, int(time.time() * 10**6)), 'wb') as f:  # microseconds
+        #with open('{}-{}.Q'.format(self.__class__, serial), 'wb') as f:  # microseconds
             #pickle.dump(self.table, f)
 
 
@@ -73,7 +93,7 @@ class Mob():
             raise ValueError('Mob not passed position in init!')
         self.x = x
         self.y = y
-        self.r = 0
+        self.health = 0
         
         if dims and isinstance(dims, (list, tuple)):
             self.max_x = dims[0]
@@ -84,11 +104,12 @@ class Mob():
         self.alive = True
         self.serial = int(time.time() * 10**6) % (10**7)
         
-        self.target = None
-        self.flee = None
+        self.target = [None, None, None]
+        self.flee = [None, None, None]
         self.reward = 0
         
         self.sight = 0
+        self.slices = 0
         self.speed = (0, 0)
         self.moves = [(self.x, self.y)]
         
@@ -100,6 +121,18 @@ class Mob():
         
         self.q_table = None
         
+    def __str__(self):
+        return '{} at ({}, {})'.format(self.__class__, self.x, self.y)
+    def __repr__(self):
+        return str(self)
+
+    def __sub__(self, other):
+        return (self.x - other.x, self.y - other.y)
+    
+    @property
+    def r(self):
+        return self.health ** 0.5
+        
     def reset(self, x=None, y=None):
         if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
             raise ValueError('Mob not passed position in init!')
@@ -107,17 +140,57 @@ class Mob():
         self.y = y
         
         self.alive = True
+        self.target[1] = None
+        self.flee[1] = None
         self.moves = []
         
-    def __str__(self):
-        return '{} at ({}, {})'.format(self.__class__, self.x, self.y)
-        
     def observe(self, mobs=None):
-        pass
+        # most of this os to prevent mobs from switching targets mid-chase
+        
+        closest_target = [None, (10**5, 10**5), (2*10**5)**.5]  # to ensure it is reset
+        current_target = [self.target[1], self.target[2], distance(self.target[2])]  # serial, coords, distance
+        
+        closest_flee = [None, (10**5, 10**5), (2*10**5)**.5]
+        current_flee = [self.flee[1], self.flee[2], distance(self.flee[2])]
+        
+        delta = self.speed[1] - self.speed[0]  # how much closer to switch targets/flee
+        
+        for mob_type, mob_list in mobs.items():
+            if mob_type == self.target[0]:
+                for mob in mob_list:
+                    ds = distance(mob - self)
+                    if mob.serial == current_target[0]:
+                        current_target[1] = mob - self
+                        current_target[2] = distance(mob - self)
+                    if ds < closest_target[2]:
+                        closest_target = [mob.serial, mob - self, distance(mob - self)]
+            elif mob_type == self.flee[0]:
+                for mob in mob_list:
+                    ds = distance(mob - self)
+                    if mob.serial == current_flee[0]:
+                        current_flee[1] = mob - self
+                        current_flee[2] = distance(mob - self)
+                    if ds < closest_flee[2]:
+                        closest_flee = [mob.serial, mob - self, distance(mob - self)]
+        
+        if (current_target[2] and (closest_target[2] <= current_target[2] - delta)) or (closest_target[2] <= self.speed[1]) or (self.target[0] and current_target[0] == None):
+            current_target = closest_target
+            self.target = [self.target[0], current_target[0], current_target[1]]
+        if (current_flee[2] and (closest_flee[2] <= current_flee[2] - delta)) or (closest_flee[2] <= self.speed[1]) or (self.flee[0] and current_flee[0] == None):
+            current_flee = closest_flee
+            self.flee = [self.flee[0], current_flee[0], current_flee[1]]
+            
+        return (current_target[1], current_flee[1])  # mob - self (x, y)
 
     def action(self, epsilon=0, observation=None):
         if random.random() > epsilon:
             choice = random.randint(0,16)  # np.argmax
+            q_key = []
+            for addrac in observation:
+                quad = self.q_table.get_quad(addrac)
+                rng = self.q_table.get_range(addrac)
+                q_key.append((quad, rng))
+            q_key = tuple(q_key)
         else:
             choice = random.randint(0,16)
 
@@ -183,22 +256,9 @@ class Mob():
 
     def update_q(self):
         pass
-
-    def __sub__(self, other):
-        return (self.x - other.x, self.y - other.y)
         
     def display(self, gameDisplay=None):
         if gameDisplay:
-            # show current location
-            try:
-                pygame.draw.ellipse(gameDisplay, self.color, (self.x - self.r, self.y - self.r, self.r * 2, self.r * 2))  # physical, pygame
-            except:
-                pygame.draw.circle(gameDisplay, self.color, (self.x, self.y), self.r)  # pygame_sdl2
-            if self.sight >= 1:
-                try:
-                    pygame.draw.ellipse(gameDisplay, self.color, (self.x - self.sight, self.y - self.sight, self.sight * 2, self.sight * 2), 1)  # sight range, pygame
-                except:
-                    pygame.draw.circle(gameDisplay, self.color, (self.x, self.y), self.sight, width=1)  # pygame_sdl2
             
             # show move history
             if self.show_moves:
@@ -211,6 +271,25 @@ class Mob():
                 for pt in range(start, len(self.moves) - 1):
                     pygame.draw.line(gameDisplay, self.color, self.moves[pt], self.moves[pt+1], 1)
                 pygame.draw.line(gameDisplay, self.color, self.moves[-1], (self.x, self.y), 1)
+            
+            # show current location
+            try:
+                pygame.draw.ellipse(gameDisplay, self.color, (self.x - self.r, self.y - self.r, self.r * 2, self.r * 2))  # physical, pygame
+            except:
+                pygame.draw.circle(gameDisplay, self.color, (self.x, self.y), self.r)  # pygame_sdl2
+            
+            # show target/flee
+            if self.target[1]:
+                pygame.draw.line(gameDisplay, colors.white, self.target[2], (self.x, self.y), 1)
+            if self.flee[1]:
+                pygame.draw.line(gameDisplay, colors.white, self.flee[2], (self.x, self.y), 1)
+            
+            # show sight ring
+            if self.sight >= 1:
+                try:
+                    pygame.draw.ellipse(gameDisplay, self.color, (self.x - self.sight, self.y - self.sight, self.sight * 2, self.sight * 2), 1)  # sight range, pygame
+                except:
+                    pygame.draw.circle(gameDisplay, self.color, (self.x, self.y), self.sight, width=1)  # pygame_sdl2
         
         else:
             raise RuntimeError('Error drawing {}'.format(self.__class__))
@@ -225,7 +304,7 @@ class Food(Mob):
         else:
             raise ValueError('No app dimensions passed to Food!')
         
-        self.r = 2
+        self.health = 4
         self.color = (0, 255, 0)
         
     def action(self, epsilon=0, observation=None):
@@ -241,12 +320,13 @@ class Prey(Mob):
         else:
             raise ValueError('No app dimensions passed to Prey!')
         
-        self.r = 5
+        self.health = 20
         
-        self.target = Food
-        self.flee = Predator
+        self.target = ['Food', None, None]  # type, serial, coords
+        self.flee = ['Predator', None, None]
         
         self.sight = 50
+        self.slices = 8
         self.speed = (2, 6)  # wander, run
         
         self.color = (0, 0, 255)
@@ -256,7 +336,7 @@ class Prey(Mob):
         self.discount = 0.67
         
         if not load:
-            self.q_table = Q_table(r=self.sight, slices=8)
+            self.q_table = Q_table(r=self.sight, slices=self.slices)
         else:
             self.q_table = Q_table(load=load)
 
@@ -270,12 +350,12 @@ class Predator(Mob):
         else:
             raise ValueError('No app dimensions passed to Predator!')
         
-        self.r = 10
+        self.health = 50
         
-        self.target = Prey
-        self.flee = None
+        self.target = ['Prey', None, None]
         
         self.sight = 100
+        self.slices = 16
         self.speed = (4, 10)
         
         self.color = (255, 0, 0)
@@ -285,16 +365,22 @@ class Predator(Mob):
         self.discount = 0.95  # with better time pref than prey
         
         if not load:
-            self.q_table = Q_table(r=self.sight, slices=16)
+            self.q_table = Q_table(r=self.sight, slices=self.slices)
         else:
             self.q_table = Q_table(load=load)
         
         self.log = open('resources/pred.log', 'w')
+        self.log.write('{}, {}'.format(self.__class__, self.serial))
         self.log.write('{}\n'.format(self.q_table.table))
 
+    def observe(self, mobs=None):
+        target, flee = super().observe(mobs=mobs)
+        self.log.write('target: {:<10}  | flee: {}'.format(self.target, self.flee))
+        return (target, flee)
+    
     def action(self, epsilon=0, observation=None):
         # movement logging for debugging
         choice, mx, my = super().action(epsilon=epsilon, observation=observation)
         if self.log:
             self.log.write('choice: {:<2}  |  move: ({:>6}, {:>6})  |  ds = {}\n'.format(choice, round(mx, 2), round(my, 2), round((mx**2 +my**2)**.5, 2)))
-
+        return (choice, mx, my)
