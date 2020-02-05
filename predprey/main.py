@@ -36,20 +36,20 @@ PRED_TABLE = False
 
 
 def init_mobs(food=0, prey=(0, False), pred=(0, False)):
-    mobs = {'food': [],
-            'prey': [],
-            'predator': [],
+    mobs = {'Food': [],
+            'Prey': [],
+            'Predator': [],
            }
     dims = (WIDTH, HEIGHT)
     
     for f in range(food):
-        mobs['food'].append(Food(x=0, y=0, dims=dims))
+        mobs['Food'].append(Food(x=0, y=0, dims=dims))
     
     for p in range(prey[0]):
-        mobs['prey'].append(Prey(x=0, y=0, dims=dims, load=prey[1]))
+        mobs['Prey'].append(Prey(x=0, y=0, dims=dims, load=prey[1]))
     
     for p in range(pred[0]):
-        mobs['predator'].append(Predator(x=0, y=0, dims=dims, load=pred[1]))
+        mobs['Predator'].append(Predator(x=0, y=0, dims=dims, load=pred[1]))
     
     return mobs
 
@@ -112,7 +112,7 @@ def run():
                 for mob in mob_list:
                     if mob.alive:
 
-                        observation = mob.observe(mobs)  # find the closest food/prey/predator
+                        observation = mob.observe(mobs=mobs)  # find the closest food/prey/predator
                         mob.action(epsilon=epsilon, observation=observation)  # take an action
                         mob.check(mobs)  # check to see what has happened
                         mob.update_q()  # learn from what mob did

@@ -126,6 +126,9 @@ class Mob():
     def __repr__(self):
         return str(self)
 
+    def __add__(self, other):
+        return (self.x + other.x, self.y + other.y)
+
     def __sub__(self, other):
         return (self.x - other.x, self.y - other.y)
     
@@ -145,7 +148,7 @@ class Mob():
         self.moves = []
         
     def observe(self, mobs=None):
-        # most of this os to prevent mobs from switching targets mid-chase
+        # most of this is to prevent mobs from switching targets mid-chase
         
         closest_target = [None, (10**5, 10**5), (2*10**5)**.5]  # to ensure it is reset
         current_target = [self.target[1], self.target[2], distance(self.target[2])]  # serial, coords, distance
@@ -173,14 +176,21 @@ class Mob():
                     if ds < closest_flee[2]:
                         closest_flee = [mob.serial, mob - self, distance(mob - self)]
         
-        if (current_target[2] and (closest_target[2] <= current_target[2] - delta)) or (closest_target[2] <= self.speed[1]) or (self.target[0] and current_target[0] == None):
-            current_target = closest_target
-            self.target = [self.target[0], current_target[0], current_target[1]]
-        if (current_flee[2] and (closest_flee[2] <= current_flee[2] - delta)) or (closest_flee[2] <= self.speed[1]) or (self.flee[0] and current_flee[0] == None):
-            current_flee = closest_flee
-            self.flee = [self.flee[0], current_flee[0], current_flee[1]]
+        target_closer = (self.target[1] != None and closest_target[2] <= current_target[2] - delta)
+        target_one_mv = closest_target[2] <= self.speed[1]
+        target_empty = (self.target[0] != None and self.target[1] == None)
+        if target_closer or target_one_mv or target_empty:
+            #current_target = closest_target
+            self.target = [self.target[0], closest_target[0], closest_target[1]]
+
+        flee_closer = (self.flee[1] != None and closest_flee[2] <= current_flee[2] - delta)
+        flee_one_mv = closest_flee[2] <= self.speed[1]
+        flee_empty = (self.flee[0] != None and self.flee[1] == None)
+        if flee_closer or flee_one_mv or flee_empty:
+            #current_flee = closest_flee
+            self.flee = [self.flee[0], closest_flee[0], closest_flee[1]]
             
-        return (current_target[1], current_flee[1])  # mob - self (x, y)
+        return (self.target[2], self.flee[2])  # mob - self (x, y)
 
     def action(self, epsilon=0, observation=None):
         if random.random() > epsilon:
@@ -280,9 +290,13 @@ class Mob():
             
             # show target/flee
             if self.target[1]:
-                pygame.draw.line(gameDisplay, colors.white, self.target[2], (self.x, self.y), 1)
+                pygame.draw.line(gameDisplay, colors.white, (self.target[2][0] + self.x, self.target[2][1] + self.y), (self.x, self.y), 1)
+            elif self.target[0] != None:
+                pygame.draw.line(gameDisplay, colors.white, (0, 0), (self.x, self.y), 1)
             if self.flee[1]:
-                pygame.draw.line(gameDisplay, colors.white, self.flee[2], (self.x, self.y), 1)
+                pygame.draw.line(gameDisplay, colors.white, (self.flee[2][0] + self.x, self.flee[2][1] + self.y), (self.x, self.y), 1)
+            elif self.flee[0] != None:
+                pygame.draw.line(gameDisplay, colors.white, (self.max_x, self.max_y), (self.x, self.y), 1)
             
             # show sight ring
             if self.sight >= 1:
@@ -375,7 +389,7 @@ class Predator(Mob):
 
     def observe(self, mobs=None):
         target, flee = super().observe(mobs=mobs)
-        self.log.write('target: {:<10}  | flee: {}'.format(self.target, self.flee))
+        self.log.write('target: {}  | flee: {}\n'.format(self.target[1], self.flee[1]))
         return (target, flee)
     
     def action(self, epsilon=0, observation=None):
