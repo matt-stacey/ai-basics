@@ -29,7 +29,7 @@ def distance(coords=(0,0)):
     if not isinstance(coords, (list, tuple)) or len(coords) < 2:
         return None
     
-    return ((coords[0]**2)+(coords[1]**2)**0.5)
+    return ((coords[0]**2)+(coords[1]**2))**0.5
 
 
 class Q_table():
@@ -62,8 +62,8 @@ class Q_table():
         
         return table
     
-    def get_quad(self, addrac):
-        theta = angle(addrac)
+    def get_quad(self, mob):
+        theta = None if mob == None else angle((mob.x, mob.y))
         if theta == None:
             return None
         
@@ -72,14 +72,24 @@ class Q_table():
         if theta >= self.angle_bounds[1]:
             theta -= 360
         
+        for num, key in enumerate(self.quads[1:]):  # exclude None
+            low, high = key
+            if low <= theta < high:
+                return num
         
+        return None
     
-    def get_range(self, addrac):
-        r = distance(addrac)
+    def get_range(self, mob):
+        r = None if mob == None else distance((mob.x, mob.y))
         if r == None:
             return None
         
-        
+        for num, key in enumerate(self.ranges[1:]):
+            low, high = key
+            if low <= r < high:
+                return num
+                
+        return None
     
     def save(self, serial):
         pass  # FIXME pickle out
@@ -104,8 +114,8 @@ class Mob():
         self.alive = True
         self.serial = int(time.time() * 10**6) % (10**7)
         
-        self.target = [None, None, None]
-        self.flee = [None, None, None]
+        self.target = [None, None]
+        self.flee = [None, None]
         self.reward = 0
         
         self.sight = 0
@@ -145,62 +155,43 @@ class Mob():
         self.alive = True
         self.target[1] = None
         self.flee[1] = None
+        self.reward = 0
         self.moves = []
         
     def observe(self, mobs=None):
-        # most of this is to prevent mobs from switching targets mid-chase
-        
-        closest_target = [None, (10**5, 10**5), (2*10**5)**.5]  # to ensure it is reset
-        current_target = [self.target[1], self.target[2], distance(self.target[2])]  # serial, coords, distance
-        
-        closest_flee = [None, (10**5, 10**5), (2*10**5)**.5]
-        current_flee = [self.flee[1], self.flee[2], distance(self.flee[2])]
-        
+        # prevent mobs from switching too much
         delta = self.speed[1] - self.speed[0]  # how much closer to switch targets/flee
         
         for mob_type, mob_list in mobs.items():
             if mob_type == self.target[0]:
                 for mob in mob_list:
                     ds = distance(mob - self)
-                    if mob.serial == current_target[0]:
-                        current_target[1] = mob - self
-                        current_target[2] = distance(mob - self)
-                    if ds < closest_target[2]:
-                        closest_target = [mob.serial, mob - self, distance(mob - self)]
+                    if mob.alive and (self.target[1] == None or ds < distance(self.target[1] - self) - delta) and distance(mob - self) <= self.sight:
+                        self.target[1] = mob
+            
             elif mob_type == self.flee[0]:
                 for mob in mob_list:
                     ds = distance(mob - self)
-                    if mob.serial == current_flee[0]:
-                        current_flee[1] = mob - self
-                        current_flee[2] = distance(mob - self)
-                    if ds < closest_flee[2]:
-                        closest_flee = [mob.serial, mob - self, distance(mob - self)]
+                    if mob.alive and (self.flee[1] == None or ds < distance(self.flee[1] - self) - delta) and distance(mob - self) <= self.sight:
+                        self.flee[1] = mob
         
-        target_closer = (self.target[1] != None and closest_target[2] <= current_target[2] - delta)
-        target_one_mv = closest_target[2] <= self.speed[1]
-        target_empty = (self.target[0] != None and self.target[1] == None)
-        if target_closer or target_one_mv or target_empty:
-            #current_target = closest_target
-            self.target = [self.target[0], closest_target[0], closest_target[1]]
-
-        flee_closer = (self.flee[1] != None and closest_flee[2] <= current_flee[2] - delta)
-        flee_one_mv = closest_flee[2] <= self.speed[1]
-        flee_empty = (self.flee[0] != None and self.flee[1] == None)
-        if flee_closer or flee_one_mv or flee_empty:
-            #current_flee = closest_flee
-            self.flee = [self.flee[0], closest_flee[0], closest_flee[1]]
-            
-        return (self.target[2], self.flee[2])  # mob - self (x, y)
+        if self.target[1] != None and distance(self.target[1] - self) > self.sight:
+            self.target[1] = None
+        if self.flee[1] != None and distance(self.flee[1] - self) > self.sight:
+            self.flee[1] = None
+        
+        return (self.target[1], self.flee[1])
 
     def action(self, epsilon=0, observation=None):
         if random.random() > epsilon:
             choice = random.randint(0,16)  # np.argmax
             q_key = []
-            for addrac in observation:
-                quad = self.q_table.get_quad(addrac)
-                rng = self.q_table.get_range(addrac)
+            for mob in observation:
+                quad = self.q_table.get_quad(mob)
+                rng = self.q_table.get_range(mob)
                 q_key.append((quad, rng))
             q_key = tuple(q_key)
+            choice = np.argmax(self.q_table.table[q_key])
         else:
             choice = random.randint(0,16)
 
@@ -262,7 +253,15 @@ class Mob():
         return (mx, my)
         
     def check(self, mobs=None):
-        pass
+        for mob_type, mob_list in mobs.items():
+            if mob_type == self.target[0]:
+                for mob in mob_list:
+                    ds = distance(mob - self)
+                    if ds < (self.r + mob.r):
+                        #eat the prey/food
+                        self.health += mob.health
+                        mob.health = 0
+                        mob.alive = False
 
     def update_q(self):
         pass
@@ -290,13 +289,13 @@ class Mob():
             
             # show target/flee
             if self.target[1]:
-                pygame.draw.line(gameDisplay, colors.white, (self.target[2][0] + self.x, self.target[2][1] + self.y), (self.x, self.y), 1)
-            elif self.target[0] != None:
-                pygame.draw.line(gameDisplay, colors.white, (0, 0), (self.x, self.y), 1)
+                pygame.draw.line(gameDisplay, colors.white, (self.target[1].x, self.target[1].y), (self.x, self.y), 1)
+            #elif self.target[0] != None:
+                #pygame.draw.line(gameDisplay, colors.white, (0, 0), (self.x, self.y), 1)
             if self.flee[1]:
-                pygame.draw.line(gameDisplay, colors.white, (self.flee[2][0] + self.x, self.flee[2][1] + self.y), (self.x, self.y), 1)
-            elif self.flee[0] != None:
-                pygame.draw.line(gameDisplay, colors.white, (self.max_x, self.max_y), (self.x, self.y), 1)
+                pygame.draw.line(gameDisplay, colors.white, (self.flee[1].x, self.flee[1].y), (self.x, self.y), 3)
+            #elif self.flee[0] != None:
+                #pygame.draw.line(gameDisplay, colors.white, (self.max_x, self.max_y), (self.x, self.y), 1)
             
             # show sight ring
             if self.sight >= 1:
@@ -336,8 +335,8 @@ class Prey(Mob):
         
         self.health = 20
         
-        self.target = ['Food', None, None]  # type, serial, coords
-        self.flee = ['Predator', None, None]
+        self.target = ['Food', None]  # type, mob
+        self.flee = ['Predator', None]
         
         self.sight = 50
         self.slices = 8
@@ -366,7 +365,7 @@ class Predator(Mob):
         
         self.health = 50
         
-        self.target = ['Prey', None, None]
+        self.target = ['Prey', None]
         
         self.sight = 100
         self.slices = 16

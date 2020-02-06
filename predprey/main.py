@@ -25,7 +25,7 @@ clock = pygame.time.Clock()
 FPS = 30
 
 # Q learning variables
-EPISODES = 20000
+EPISODES = 2000
 SHOW = 1  # how often to visualize
 epsilon = 0.9  # random action threshhold
 DECAY_RATE = 0.9998  # espilon *= DECAY_RATE
@@ -91,7 +91,7 @@ def run():
         for mob in mob_list:
             rewards[(mob.__class__, mob.serial)] = []
 
-    SEC = 7
+    frames = 200
     
     for episode in range(EPISODES):
         show_this = True if episode % SHOW == 0 else False
@@ -104,10 +104,10 @@ def run():
                 mob.reset(x=x, y=y)
         
         # run the episode
-        for k in range(SEC * FPS):
+        for k in range(frames):
             gameDisplay.fill(colors.black)
             
-            # update and display all mobs
+            # update all mobs
             for mob_type, mob_list in mobs.items():
                 for mob in mob_list:
                     if mob.alive:
@@ -117,16 +117,20 @@ def run():
                         mob.check(mobs)  # check to see what has happened
                         mob.update_q()  # learn from what mob did
 
-                        if show_this:
+            # display all mobs
+            if show_this:
+                for mob_type, mob_list in mobs.items():
+                    for mob in mob_list:
+                        if mob.alive:
                             mob.display(gameDisplay)
-                    else:
-                        pass  # poppable?
             
             # complete the render and wait to cycle
             display_stats(episode, mobs)
             pygame.display.update()
             if show_this:
                 clock.tick(FPS)  # no need to wait if we aren't visualizing
+            else:
+                clock.tick(10**10)
 
         # clean up the episode
 
