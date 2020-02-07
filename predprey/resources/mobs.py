@@ -62,15 +62,9 @@ class Q_table():
         
         return table
     
-    def get_quad(self, mob):
-        theta = None if mob == None else angle((mob.x, mob.y))
+    def get_quad(self, theta):
         if theta == None:
             return None
-        
-        if theta < self.angle_bounds[0]:
-            theta += 360
-        if theta >= self.angle_bounds[1]:
-            theta -= 360
         
         for num, key in enumerate(self.quads[1:]):  # exclude None
             low, high = key
@@ -79,8 +73,7 @@ class Q_table():
         
         return None
     
-    def get_range(self, mob):
-        r = None if mob == None else distance((mob.x, mob.y))
+    def get_range(self, r):
         if r == None:
             return None
         
@@ -166,30 +159,39 @@ class Mob():
             if mob_type == self.target[0]:
                 for mob in mob_list:
                     ds = distance(mob - self)
-                    if mob.alive and (self.target[1] == None or ds < distance(self.target[1] - self) - delta) and distance(mob - self) <= self.sight:
+                    if mob.alive and (self.target[1] == None or ds < distance((self.target[1].x - self.x, self.target[1].y - self.y)) - delta):
                         self.target[1] = mob
             
             elif mob_type == self.flee[0]:
                 for mob in mob_list:
                     ds = distance(mob - self)
-                    if mob.alive and (self.flee[1] == None or ds < distance(self.flee[1] - self) - delta) and distance(mob - self) <= self.sight:
+                    if mob.alive and (self.flee[1] == None or ds < distance((self.flee[1].x - self.x, self.flee[1].y - self.y)) - delta):
                         self.flee[1] = mob
-        
+        '''
         if self.target[1] != None and distance(self.target[1] - self) > self.sight:
             self.target[1] = None
         if self.flee[1] != None and distance(self.flee[1] - self) > self.sight:
             self.flee[1] = None
-        
+        '''
         return (self.target[1], self.flee[1])
 
     def action(self, epsilon=0, observation=None):
+        q_key = []
+        t = []
+        r = []
+        
         if random.random() > epsilon:
             choice = random.randint(0,16)  # np.argmax
-            q_key = []
             for mob in observation:
-                quad = self.q_table.get_quad(mob)
-                rng = self.q_table.get_range(mob)
-                q_key.append((quad, rng))
+                theta = None if mob == None else angle((mob.x - self.x, mob.y - self.y))
+                t.append(theta)
+                quad = self.q_table.get_quad(theta)
+                
+                rng = None if mob == None else distance((mob.x - self.x, mob.y - self.y))
+                r.append(rng)
+                band = self.q_table.get_range(rng)
+                q_key.append((quad, band))
+            
             q_key = tuple(q_key)
             choice = np.argmax(self.q_table.table[q_key])
         else:
@@ -226,7 +228,7 @@ class Mob():
             dy *= self.speed[0]
             
         mx, my = self.move(dx=dx, dy=dy, run=run)
-        return (choice, mx, my)
+        return (choice, mx, my, q_key, t, r)
         
     def move(self, dx=None, dy=None, run=False):
         dx = dx if isinstance(dx, int) else random.randint(0, self.speed[1])
@@ -253,15 +255,20 @@ class Mob():
         return (mx, my)
         
     def check(self, mobs=None):
+        eaten_mobs = []
         for mob_type, mob_list in mobs.items():
             if mob_type == self.target[0]:
                 for mob in mob_list:
                     ds = distance(mob - self)
-                    if ds < (self.r + mob.r):
-                        #eat the prey/food
+                    if mob.alive and ds < (self.r + mob.r):
+                        # eat the prey/food
                         self.health += mob.health
+                        self.target[1] = None
                         mob.health = 0
                         mob.alive = False
+                        eaten_mobs.append(mob.serial)
+        
+        return eaten_mobs
 
     def update_q(self):
         pass
@@ -383,17 +390,36 @@ class Predator(Mob):
             self.q_table = Q_table(load=load)
         
         self.log = open('resources/pred.log', 'w')
-        self.log.write('{}, {}'.format(self.__class__, self.serial))
-        self.log.write('{}\n'.format(self.q_table.table))
+        if self.log:
+            self.log.write('{}, {}\n'.format(self.__class__, self.serial))
+            #self.log.write('{}\n'.format(self.q_table.table.keys()))
+            self.log.write('{}\n{}\n'.format(self.q_table.quads, self.q_table.ranges))
+            #self.log.write('{}\n'.format(self.q_table.table))
 
     def observe(self, mobs=None):
         target, flee = super().observe(mobs=mobs)
-        self.log.write('target: {}  | flee: {}\n'.format(self.target[1], self.flee[1]))
+        
+        if self.log:
+            target_p = target if target == None else (target.serial, target.alive)
+            flee_p = flee if flee == None else flee.serial
+            self.log.write('\ntarget: {}  | flee: {}\n'.format(target_p, flee_p))
+        
         return (target, flee)
     
     def action(self, epsilon=0, observation=None):
         # movement logging for debugging
-        choice, mx, my = super().action(epsilon=epsilon, observation=observation)
+        choice, mx, my, q_key, r, t = super().action(epsilon=epsilon, observation=observation)
+        
         if self.log:
-            self.log.write('choice: {:<2}  |  move: ({:>6}, {:>6})  |  ds = {}\n'.format(choice, round(mx, 2), round(my, 2), round((mx**2 +my**2)**.5, 2)))
+            #self.log.write('choice: {:<2}  |  move: ({:>6}, {:>6})\n'.format(choice, round(mx, 2), round(my, 2)))
+            self.log.write('ds = {}  |  q_key: {}\n'.format(round((mx**2 +my**2)**.5, 2), q_key))
+            self.log.write('angles: {}  |  ranges: {}\n'.format(t, r))
+            
         return (choice, mx, my)
+
+    def check(self, mobs=None):
+        eaten_mobs = super().check(mobs=mobs)
+        
+        if len(eaten_mobs) > 0 and self.log:
+            self.log.write('** ATE: {}\n'.format(eaten_mobs))
+        
