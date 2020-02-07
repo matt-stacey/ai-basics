@@ -54,10 +54,10 @@ def init_mobs(food=0, prey=(0, False), pred=(0, False)):
     return mobs
 
 
-def display_stats(episode, mobs):
+def display_stats(episode, frame, mobs):
     font = pygame.font.SysFont(None, 32)
     
-    text = font.render('episode: {}'.format(episode), True, colors.white)
+    text = font.render('episode/frame: {}/{}'.format(episode, frame), True, colors.white)
     gameDisplay.blit(text,(0, 0))
     
     for num, key in enumerate(mobs.keys()):
@@ -125,7 +125,7 @@ def run():
                             mob.display(gameDisplay)
             
             # complete the render and wait to cycle
-            display_stats(episode, mobs)
+            display_stats(episode, k+1, mobs)
             pygame.display.update()
             if show_this:
                 clock.tick(FPS)  # no need to wait if we aren't visualizing
