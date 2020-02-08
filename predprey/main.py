@@ -25,9 +25,10 @@ clock = pygame.time.Clock()
 FPS = 30
 
 # Q learning variables
-EPISODES = 2000
-SHOW = 1  # how often to visualize
-epsilon = 0.9  # random action threshhold
+EPISODES = 21
+SHOW = 10  # how often to visualize
+FRAMES = 200  # per episode
+EPSILON = 0.9  # random action threshhold
 DECAY_RATE = 0.9998  # espilon *= DECAY_RATE
 
 # existing Q tables
@@ -70,6 +71,19 @@ def display_stats(episode, frame, mobs):
         gameDisplay.blit(text,(0, (num+1)*40))
 
 
+def episode_cleanup(episode, mobs, rewards):
+    print('Episode {}/{} completed at {}'.format(episode+1, EPISODES, time.asctime()))
+    for mob_type, mob_list in mobs.items():
+        if mob_type != 'Food':
+            for mob in mob_list:
+                print('{} {}: {}'.format(mob.__class__, mob.serial, rewards[mob][episode]))
+    print('\n' + '='*60 + '\n')
+
+
+def plot_rewards(rewards):
+    pass
+
+
 def exit_sim():
     fade_out = 1
     pygame.mixer.music.fadeout(fade_out * 1000)
@@ -84,14 +98,12 @@ def run():
     
     mobs = init_mobs(food=40, prey=(5, PREY_TABLE), pred=(1, PRED_TABLE))
 
-    # FIXME
-    # tally up all episode rewards so we can graph them for each mob 'brain'
+    epsilon = EPSILON
+
     rewards = {}
     for mob_type, mob_list in mobs.items():
         for mob in mob_list:
-            rewards[(mob.__class__, mob.serial)] = []
-
-    frames = 200
+            rewards[mob] = [ 0 ] * EPISODES
     
     for episode in range(EPISODES):
         show_this = True if episode % SHOW == 0 else False
@@ -104,17 +116,17 @@ def run():
                 mob.reset(x=x, y=y)
         
         # run the episode
-        for k in range(frames):
+        for k in range(FRAMES):
             gameDisplay.fill(colors.black)
             
             # update all mobs
             for mob_type, mob_list in mobs.items():
                 for mob in mob_list:
                     if mob.alive:
-
                         observation = mob.observe(mobs=mobs)  # find the closest food/prey/predator
-                        mob.action(epsilon=epsilon, observation=observation)  # take an action
-                        mob.check(mobs)  # check to see what has happened
+                        mx, my, _, _ = mob.action(epsilon=epsilon, observation=observation)  # take an action
+                        reward, _ = mob.check(mobs=mobs, mx=mx, my=my)  # check to see what has happened
+                        rewards[mob][episode] += reward
                         mob.update_q()  # learn from what mob did
 
             # display all mobs
@@ -133,6 +145,10 @@ def run():
                 clock.tick(10**10)
 
         # clean up the episode
+        episode_cleanup(episode, mobs, rewards)
+        epsilon *= DECAY_RATE
+
+    plot_rewards(rewards)
 
 
 def main():

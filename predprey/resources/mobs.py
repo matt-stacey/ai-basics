@@ -117,7 +117,6 @@ class Mob():
         
         self.target = [None, None]
         self.flee = [None, None]
-        self.reward = 0
         
         self.sight = 0
         self.slices = 0
@@ -156,7 +155,6 @@ class Mob():
         self.alive = True
         self.target[1] = None
         self.flee[1] = None
-        self.reward = 0
         self.moves = []
         
     def observe(self, mobs=None):
@@ -167,13 +165,13 @@ class Mob():
             if mob_type == self.target[0]:
                 for mob in mob_list:
                     ds = distance(mob - self)
-                    if mob.alive and (self.target[1] == None or ds < distance((self.target[1].x - self.x, self.target[1].y - self.y)) - delta):
+                    if mob.alive and (self.target[1] == None or ds < distance(self.target[1] - self) - delta):
                         self.target[1] = mob
             
             elif mob_type == self.flee[0]:
                 for mob in mob_list:
                     ds = distance(mob - self)
-                    if mob.alive and (self.flee[1] == None or ds < distance((self.flee[1].x - self.x, self.flee[1].y - self.y)) - delta):
+                    if mob.alive and (self.flee[1] == None or ds < distance(self.flee[1] - self) - delta):
                         self.flee[1] = mob
         
         if self.target[1] != None and distance(self.target[1] - self) > self.sight:
@@ -181,27 +179,27 @@ class Mob():
         if self.flee[1] != None and distance(self.flee[1] - self) > self.sight:
             self.flee[1] = None
         
-        return (self.target[1], self.flee[1])
+        return self.target[1], self.flee[1]
 
     def action(self, epsilon=0, observation=None):
         q_key = []
         #t = []
         #r = []
         
-        if random.random() > epsilon or True:
+        if random.random() > epsilon or True:  # FIXME remove True to allow learning
             choice = random.randint(0,16)  # np.argmax
             for mob in observation:
-                theta = None if mob == None else angle((mob.x - self.x, mob.y - self.y))
+                theta = None if mob == None else angle(mob - self)
                 #t.append(theta)
                 quad = self.q_table.get_quad(theta)
                 
-                rng = None if mob == None else distance((mob.x - self.x, mob.y - self.y))
+                rng = None if mob == None else distance(mob - self)
                 #r.append(rng)
                 band = self.q_table.get_range(rng)
                 q_key.append((quad, band))
             
             q_key = tuple(q_key)
-            #choice = np.argmax(self.q_table.table[q_key])
+            #choice = np.argmax(self.q_table.table[q_key])  # FIXME
         else:
             choice = random.randint(0,16)
 
@@ -240,7 +238,7 @@ class Mob():
             dy *= self.speed[0]
             
         mx, my = self.move(dx=dx, dy=dy, run=run)
-        return (choice, mx, my, q_key)#, t, r)
+        return mx, my, choice, q_key  #, t, r
         
     def move(self, dx=None, dy=None, run=False):
         dx = dx if isinstance(dx, int) else random.randint(0, self.speed[1])
@@ -263,24 +261,33 @@ class Mob():
         self.y += my
         
         self.moves.append((self.x, self.y))
-        self.reward -= (mx**2 + my**2)  # 1/2mv**2: moving further costs exponentially FIXME
-        return (mx, my)
+        return mx, my
         
-    def check(self, mobs=None):
+    def check(self, mobs=None, mx=0, my=0):
+        reward = -1  # turn penalty
+        reward -= 1/2 * (mx**2 + my**2)  # move penalty
         eaten_mobs = []
+        
         for mob_type, mob_list in mobs.items():
             if mob_type == self.target[0]:
                 for mob in mob_list:
                     ds = distance(mob - self)
                     if mob.alive and ds < (self.r + mob.r):
-                        # eat the prey/food
+                        # eat the prey/food, be rewarded
                         self.health += mob.health
+                        reward += mob.health ** 2
                         self.target[1] = None
                         mob.health = 0
                         mob.alive = False
                         eaten_mobs.append(mob.serial)
+            elif mob_type == self.flee[0]:
+                for mob in mob_list:
+                    ds = distance(mob - self)
+                    if mob.alive and ds < (self.r + mob.r):
+                        # pentalty for being eaten
+                        reward -= self.health ** 2
         
-        return eaten_mobs
+        return reward, eaten_mobs
 
     def update_q(self):
         pass
@@ -340,11 +347,14 @@ class Food(Mob):
         self.health = self.health_init
         self.color = (0, 255, 0)
     
-    def observe(self, mobs=None):
-        pass
-    def action(self, epsilon=0, observation=None):
+    def observe(self, *args, **kwargs):
+        return None, None  # return a tuple of no target/flee
+    def action(self, *args, **kwargs):
         self.health += 0.2  # grow!
-    def check(self, mobs=None):
+        return 0, 0, 0, (None, None)
+    def check(self, *args, **kwargs):
+        return 0, []
+    def update_q(self, *args, **kwargs):
         pass
 
 
@@ -410,7 +420,7 @@ class Predator(Mob):
         else:
             self.q_table = Q_table(r=self.sight, bands=self.bands, slices=self.slices, load=load)
         
-        self.log = open('resources/pred.log', 'w')
+        self.log = False  # open('resources/pred.log', 'w')
         if self.log:
             self.log.write('{}, {}\n'.format(self.__class__, self.serial))
             #self.log.write('{}\n'.format(self.q_table.table.keys()))
@@ -429,18 +439,19 @@ class Predator(Mob):
     
     def action(self, epsilon=0, observation=None):
         # movement logging for debugging
-        choice, mx, my, q_key = super().action(epsilon=epsilon, observation=observation)  #t, r debug
+        mx, my, choice, q_key = super().action(epsilon=epsilon, observation=observation)  #t, r debug
         
         if self.log:
             #self.log.write('choice: {:<2}  |  move: ({:>6}, {:>6})\n'.format(choice, round(mx, 2), round(my, 2)))
             self.log.write('ds = {}  |  q_key: {}\n'.format(round((mx**2 +my**2)**.5, 2), q_key))
             #self.log.write('angles: {}  |  ranges: {}\n'.format(t, r))
             
-        return (choice, mx, my)
+        return mx, my, choice, q_key
 
-    def check(self, mobs=None):
-        eaten_mobs = super().check(mobs=mobs)
+    def check(self, mobs=None, mx=0, my=0):
+        reward, eaten_mobs = super().check(mobs=mobs, mx=mx, my=my)
         
         if len(eaten_mobs) > 0 and self.log:
             self.log.write('** ATE: {}\n'.format(eaten_mobs))
         
+        return reward, eaten_mobs
