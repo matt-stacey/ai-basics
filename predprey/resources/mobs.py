@@ -34,15 +34,17 @@ def distance(coords=(0,0)):
 
 class Q_table():
     
-    def __init__(self, r=0, slices=0, actions=17, load=False):
+    def __init__(self, r=0, bands=4, slices=8, actions=18, load=False):
         slices = int(slices) if slices >= 8 else 8  # at least 1 per move direction
+        bands = int(bands) if bands >= 4 else 4  # range discrimination
         theta = 360 / slices
         half = theta / 2
         
         self.quads = [(i * theta - half, i * theta + half) for i in range(slices)]
-        self.ranges = [(r * i / 4, r * (i+1) / 4) for i in range(4)]
+        self.ranges = [(r * i / bands, r * (i+1) / bands) for i in range(bands)]
         
         self.angle_bounds = (self.quads[0][0], self.quads[-1][-1])
+        self.range_bounds = (0, r)
         
         if load:
             self.table = self.q_table_setup(actions=actions)  # FIXME pickle in
@@ -58,7 +60,7 @@ class Q_table():
         angle_keys = [None] + list(range(len(self.quads)))
         range_keys = [None] + list(range(len(self.ranges)))
         
-        table = {((ta, tr), (fa, fr)): [np.random.uniform(-actions, 0) for i in range(actions)] for ta in angle_keys for tr in range_keys for fa in angle_keys for fr in range_keys}
+        table = {((ta, tr), (fa, fr)): [np.random.uniform(-actions, 0) for i in range(actions)] for ta in angle_keys for tr in range_keys for fa in angle_keys for fr in range_keys}  # (t)arget, (f)lee
         
         return table
     
@@ -66,7 +68,12 @@ class Q_table():
         if theta == None:
             return None
         
-        for num, key in enumerate(self.quads[1:]):  # exclude None
+        while theta < self.angle_bounds[0]:
+            theta += 360
+        while theta > self.angle_bounds[1]:
+            theta -= 360
+        
+        for num, key in enumerate(self.quads):
             low, high = key
             if low <= theta < high:
                 return num
@@ -77,7 +84,7 @@ class Q_table():
         if r == None:
             return None
         
-        for num, key in enumerate(self.ranges[1:]):
+        for num, key in enumerate(self.ranges):
             low, high = key
             if low <= r < high:
                 return num
@@ -96,7 +103,8 @@ class Mob():
             raise ValueError('Mob not passed position in init!')
         self.x = x
         self.y = y
-        self.health = 0
+        self.health_init = 0
+        self.health = self.health_init
         
         if dims and isinstance(dims, (list, tuple)):
             self.max_x = dims[0]
@@ -131,7 +139,6 @@ class Mob():
 
     def __add__(self, other):
         return (self.x + other.x, self.y + other.y)
-
     def __sub__(self, other):
         return (self.x - other.x, self.y - other.y)
     
@@ -145,6 +152,7 @@ class Mob():
         self.x = x
         self.y = y
         
+        self.health = self.health_init
         self.alive = True
         self.target[1] = None
         self.flee[1] = None
@@ -152,8 +160,8 @@ class Mob():
         self.moves = []
         
     def observe(self, mobs=None):
-        # prevent mobs from switching too much
-        delta = self.speed[1] - self.speed[0]  # how much closer to switch targets/flee
+        # prevent mobs from switching targets too much
+        delta = self.speed[1] + self.speed[0]  # how much closer to switch targets/flee
         
         for mob_type, mob_list in mobs.items():
             if mob_type == self.target[0]:
@@ -167,40 +175,44 @@ class Mob():
                     ds = distance(mob - self)
                     if mob.alive and (self.flee[1] == None or ds < distance((self.flee[1].x - self.x, self.flee[1].y - self.y)) - delta):
                         self.flee[1] = mob
-        '''
+        
         if self.target[1] != None and distance(self.target[1] - self) > self.sight:
             self.target[1] = None
         if self.flee[1] != None and distance(self.flee[1] - self) > self.sight:
             self.flee[1] = None
-        '''
+        
         return (self.target[1], self.flee[1])
 
     def action(self, epsilon=0, observation=None):
         q_key = []
-        t = []
-        r = []
+        #t = []
+        #r = []
         
-        if random.random() > epsilon:
+        if random.random() > epsilon or True:
             choice = random.randint(0,16)  # np.argmax
             for mob in observation:
                 theta = None if mob == None else angle((mob.x - self.x, mob.y - self.y))
-                t.append(theta)
+                #t.append(theta)
                 quad = self.q_table.get_quad(theta)
                 
                 rng = None if mob == None else distance((mob.x - self.x, mob.y - self.y))
-                r.append(rng)
+                #r.append(rng)
                 band = self.q_table.get_range(rng)
                 q_key.append((quad, band))
             
             q_key = tuple(q_key)
-            choice = np.argmax(self.q_table.table[q_key])
+            #choice = np.argmax(self.q_table.table[q_key])
         else:
             choice = random.randint(0,16)
 
-        # 17 possible actions: move in 8 inter/cardinal directions, at wander/run pace
+        # 18 possible actions: move in 8 inter/cardinal directions, at wander/run pace
+        # 17 is random
         # 0 is hold
         # 1 is north/wander, clockwise to 8
         # 9 is north/run, clockwise to 16
+
+        if choice == 17:
+            choice = random.randint(0,16)
 
         # north/south component
         if choice in (8, 1, 2, 16, 9, 10):
@@ -228,7 +240,7 @@ class Mob():
             dy *= self.speed[0]
             
         mx, my = self.move(dx=dx, dy=dy, run=run)
-        return (choice, mx, my, q_key, t, r)
+        return (choice, mx, my, q_key)#, t, r)
         
     def move(self, dx=None, dy=None, run=False):
         dx = dx if isinstance(dx, int) else random.randint(0, self.speed[1])
@@ -251,7 +263,7 @@ class Mob():
         self.y += my
         
         self.moves.append((self.x, self.y))
-        self.reward -= (mx**2 + my**2)  # 1/2mv**2: moving further costs exponentially
+        self.reward -= (mx**2 + my**2)  # 1/2mv**2: moving further costs exponentially FIXME
         return (mx, my)
         
     def check(self, mobs=None):
@@ -324,11 +336,16 @@ class Food(Mob):
         else:
             raise ValueError('No app dimensions passed to Food!')
         
-        self.health = 4
+        self.health_init = 9
+        self.health = self.health_init
         self.color = (0, 255, 0)
-        
+    
+    def observe(self, mobs=None):
+        pass
     def action(self, epsilon=0, observation=None):
-        self.reward += 1  # grow!
+        self.health += 0.2  # grow!
+    def check(self, mobs=None):
+        pass
 
 
 class Prey(Mob):
@@ -340,12 +357,14 @@ class Prey(Mob):
         else:
             raise ValueError('No app dimensions passed to Prey!')
         
-        self.health = 20
+        self.health_init = 25
+        self.health = self.health_init
         
         self.target = ['Food', None]  # type, mob
         self.flee = ['Predator', None]
         
-        self.sight = 50
+        self.sight = 60
+        self.bands = 4
         self.slices = 8
         self.speed = (2, 6)  # wander, run
         
@@ -356,9 +375,9 @@ class Prey(Mob):
         self.discount = 0.67
         
         if not load:
-            self.q_table = Q_table(r=self.sight, slices=self.slices)
+            self.q_table = Q_table(r=self.sight, bands=self.bands, slices=self.slices)
         else:
-            self.q_table = Q_table(load=load)
+            self.q_table = Q_table(r=self.sight, bands=self.bands, slices=self.slices, load=load)
 
 
 class Predator(Mob):
@@ -370,11 +389,13 @@ class Predator(Mob):
         else:
             raise ValueError('No app dimensions passed to Predator!')
         
-        self.health = 50
+        self.health_init = 50
+        self.health = self.health_init
         
         self.target = ['Prey', None]
         
-        self.sight = 100
+        self.sight = 200
+        self.bands = 8
         self.slices = 16
         self.speed = (4, 10)
         
@@ -385,9 +406,9 @@ class Predator(Mob):
         self.discount = 0.95  # with better time pref than prey
         
         if not load:
-            self.q_table = Q_table(r=self.sight, slices=self.slices)
+            self.q_table = Q_table(r=self.sight, bands=self.bands, slices=self.slices)
         else:
-            self.q_table = Q_table(load=load)
+            self.q_table = Q_table(r=self.sight, bands=self.bands, slices=self.slices, load=load)
         
         self.log = open('resources/pred.log', 'w')
         if self.log:
@@ -408,12 +429,12 @@ class Predator(Mob):
     
     def action(self, epsilon=0, observation=None):
         # movement logging for debugging
-        choice, mx, my, q_key, r, t = super().action(epsilon=epsilon, observation=observation)
+        choice, mx, my, q_key = super().action(epsilon=epsilon, observation=observation)  #t, r debug
         
         if self.log:
             #self.log.write('choice: {:<2}  |  move: ({:>6}, {:>6})\n'.format(choice, round(mx, 2), round(my, 2)))
             self.log.write('ds = {}  |  q_key: {}\n'.format(round((mx**2 +my**2)**.5, 2), q_key))
-            self.log.write('angles: {}  |  ranges: {}\n'.format(t, r))
+            #self.log.write('angles: {}  |  ranges: {}\n'.format(t, r))
             
         return (choice, mx, my)
 
