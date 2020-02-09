@@ -134,7 +134,7 @@ def run():
                         q_key = mob.observe(mobs=mobs)  # find the closest food/prey/predator
                         mx, my, _ = mob.action(epsilon=epsilon, q_key=q_key)  # take an action
                         _, reward = mob.check(mobs=mobs, mx=mx, my=my)  # check to see what has happened
-                        mob.update_q()  # learn from what mob did
+                        mob.update_q(mobs=mobs, q_key=q_key, reward=reward)  # learn from what mob did
 
                         rewards[mob][episode] += (reward[0] + reward[1])  # tally for episode rewards
 

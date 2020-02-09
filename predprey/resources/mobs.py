@@ -295,7 +295,6 @@ class Mob():
                         act_reward = self.health ** 2
         
         reward = (move_reward, act_reward)
-        print(self.__class__)
         return eaten_mobs, reward
 
     def update_q(self, mobs=None, q_key=((None, None), (None, None)), reward=0):
@@ -368,7 +367,7 @@ class Food(Mob):
         self.health += 0.2  # grow!
         return 0, 0, 0
     def check(self, *args, **kwargs):
-        return 0, []
+        return 0, (0,0)
     def update_q(self, *args, **kwargs):
         pass
 
