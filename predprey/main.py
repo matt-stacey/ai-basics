@@ -26,11 +26,11 @@ clock = pygame.time.Clock()
 FPS = 30
 
 # Q learning variables
-EPISODES = 3600*4  # 22500  # with epsilon decay rate at 0.9998, this corresponds to <1% random moves
+EPISODES = 1000  # 22500  # with epsilon decay rate at 0.9998, this corresponds to <1% random moves
 SHOW = 1000  # how often to visualize
-FRAMES = 200  # per episode
+FRAMES = 300  # per episode
 EPSILON = 0.9  # random action threshhold
-DECAY_RATE = 0.9998  # espilon *= DECAY_RATE
+DECAY_RATE = 0.999#8  # espilon *= DECAY_RATE
 
 # load/save Q tables
 TABLES = 'q_tables'
@@ -116,7 +116,7 @@ def exit_sim():
 
 def run():
     
-    mobs = init_mobs(food=64, prey=(8, PREY_TABLE), pred=(1, PRED_TABLE))
+    mobs = init_mobs(food=100, prey=(1, PREY_TABLE), pred=(0, PRED_TABLE))
 
     epsilon = EPSILON
 

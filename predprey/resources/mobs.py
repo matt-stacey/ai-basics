@@ -269,6 +269,7 @@ class Mob():
         return mx, my
         
     def check(self, mobs=None, mx=0, my=0):
+        FACTOR = 100
         move_reward = -1  # turn penalty
         move_reward -= 1/2 * (mx**2 + my**2)  # move penalty
         act_reward = 0
@@ -282,7 +283,7 @@ class Mob():
                     if mob.alive and ds < (self.r + mob.r):
                         # eat the prey/food, be rewarded
                         self.health += mob.health
-                        act_reward += mob.health ** 2
+                        act_reward += mob.health_init ** 2 * FACTOR
                         self.target[1] = None
                         mob.health = 0
                         mob.alive = False
@@ -292,7 +293,7 @@ class Mob():
                     ds = distance(mob - self)
                     if mob.alive and ds < (self.r + mob.r):
                         # pentalty for being eaten
-                        act_reward -= (self.health ** 2)
+                        act_reward -= (self.health_init ** 2) * FACTOR
         
         reward = (move_reward, act_reward)
         return reward, eaten_mobs
