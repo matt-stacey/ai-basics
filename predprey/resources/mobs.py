@@ -3,7 +3,6 @@ import math
 import numpy as np
 import pickle
 import time
-import resources.colors as colors
 
 try:
     import pygame_sdl2
@@ -11,6 +10,9 @@ try:
 except ImportError:
     pass
 import pygame
+
+
+WHITE = (255, 255, 255)
 
 
 def angle(coords=(0,0)):
@@ -47,9 +49,9 @@ class Q_table():
         self.range_bounds = (0, r)
         
         if load:
-            self.table = self.q_table_setup(actions=actions)  # FIXME pickle in
-            #with open(load, 'rb') as f:
-                #self.table = pickle.load(f)
+            print('Loading Q table from {}'.format(load))
+            with open(load, 'rb') as f:
+                self.table = pickle.load(f)
         else:
             self.table = self.q_table_setup(actions=actions)
         
@@ -91,10 +93,11 @@ class Q_table():
                 
         return None
     
-    def save(self, serial):
-        pass  # FIXME pickle out
-        #with open('{}-{}.Q'.format(self.__class__, serial), 'wb') as f:  # microseconds
-            #pickle.dump(self.table, f)
+    def save(self, directory, mob_type, serial):
+        filename = '{}/{}-{}.Q'.format(directory, mob_type, serial)
+        print('Saving Q table as {}'.format(filename))
+        with open(filename, 'wb') as f:  # microseconds
+            pickle.dump(self.table, f)
 
 
 class Mob():
@@ -179,26 +182,28 @@ class Mob():
         if self.flee[1] != None and distance(self.flee[1] - self) > self.sight:
             self.flee[1] = None
         
-        return self.target[1], self.flee[1]
-
-    def action(self, epsilon=0, observation=None):
         q_key = []
+        for mob in (self.target[1], self.flee[1]):
+            theta = None if mob == None else angle(mob - self)
+            #t.append(theta)
+            quad = self.q_table.get_quad(theta)
+            
+            rng = None if mob == None else distance(mob - self)
+            #r.append(rng)
+            band = self.q_table.get_range(rng)
+            q_key.append((quad, band))
+        
+        q_key = tuple(q_key)
+
+        return q_key
+
+    def action(self, epsilon=0, q_key=None):
         #t = []
         #r = []
         
         if random.random() > epsilon or True:  # FIXME remove True to allow learning
             choice = random.randint(0,16)  # np.argmax
-            for mob in observation:
-                theta = None if mob == None else angle(mob - self)
-                #t.append(theta)
-                quad = self.q_table.get_quad(theta)
-                
-                rng = None if mob == None else distance(mob - self)
-                #r.append(rng)
-                band = self.q_table.get_range(rng)
-                q_key.append((quad, band))
             
-            q_key = tuple(q_key)
             #choice = np.argmax(self.q_table.table[q_key])  # FIXME
         else:
             choice = random.randint(0,16)
@@ -238,7 +243,7 @@ class Mob():
             dy *= self.speed[0]
             
         mx, my = self.move(dx=dx, dy=dy, run=run)
-        return mx, my, choice, q_key  #, t, r
+        return mx, my, choice  #, t, r
         
     def move(self, dx=None, dy=None, run=False):
         dx = dx if isinstance(dx, int) else random.randint(0, self.speed[1])
@@ -264,8 +269,10 @@ class Mob():
         return mx, my
         
     def check(self, mobs=None, mx=0, my=0):
-        reward = -1  # turn penalty
-        reward -= 1/2 * (mx**2 + my**2)  # move penalty
+        move_reward = -1  # turn penalty
+        move_reward -= 1/2 * (mx**2 + my**2)  # move penalty
+        act_reward = 0
+
         eaten_mobs = []
         
         for mob_type, mob_list in mobs.items():
@@ -275,7 +282,7 @@ class Mob():
                     if mob.alive and ds < (self.r + mob.r):
                         # eat the prey/food, be rewarded
                         self.health += mob.health
-                        reward += mob.health ** 2
+                        act_reward = mob.health ** 2
                         self.target[1] = None
                         mob.health = 0
                         mob.alive = False
@@ -285,12 +292,20 @@ class Mob():
                     ds = distance(mob - self)
                     if mob.alive and ds < (self.r + mob.r):
                         # pentalty for being eaten
-                        reward -= self.health ** 2
+                        act_reward = self.health ** 2
         
-        return reward, eaten_mobs
+        reward = (move_reward, act_reward)
+        print(self.__class__)
+        return eaten_mobs, reward
 
-    def update_q(self):
-        pass
+    def update_q(self, mobs=None, q_key=((None, None), (None, None)), reward=0):
+        return  # FIXME implement
+        current_q = self.q_table.table[q_key]
+
+        new_q_key = self.observe(mobs=mobs)  # sentdex for advice
+        max_future_q = np.max(self.q_table.table[new_q_key])
+
+        move_reward, act_reward = reward
         
     def display(self, gameDisplay=None):
         if gameDisplay:
@@ -315,13 +330,13 @@ class Mob():
             
             # show target/flee
             if self.target[1]:
-                pygame.draw.line(gameDisplay, colors.white, (self.target[1].x, self.target[1].y), (self.x, self.y), 1)
+                pygame.draw.line(gameDisplay, WHITE, (self.target[1].x, self.target[1].y), (self.x, self.y), 1)
             #elif self.target[0] != None:
-                #pygame.draw.line(gameDisplay, colors.white, (0, 0), (self.x, self.y), 1)
+                #pygame.draw.line(gameDisplay, WHITE, (0, 0), (self.x, self.y), 1)
             if self.flee[1]:
-                pygame.draw.line(gameDisplay, colors.white, (self.flee[1].x, self.flee[1].y), (self.x, self.y), 3)
+                pygame.draw.line(gameDisplay, WHITE, (self.flee[1].x, self.flee[1].y), (self.x, self.y), 3)
             #elif self.flee[0] != None:
-                #pygame.draw.line(gameDisplay, colors.white, (self.max_x, self.max_y), (self.x, self.y), 1)
+                #pygame.draw.line(gameDisplay, WHITE, (self.max_x, self.max_y), (self.x, self.y), 1)
             
             # show sight ring
             if self.sight >= 1:
@@ -351,7 +366,7 @@ class Food(Mob):
         return None, None  # return a tuple of no target/flee
     def action(self, *args, **kwargs):
         self.health += 0.2  # grow!
-        return 0, 0, 0, (None, None)
+        return 0, 0, 0
     def check(self, *args, **kwargs):
         return 0, []
     def update_q(self, *args, **kwargs):
@@ -427,31 +442,21 @@ class Predator(Mob):
             self.log.write('{}\n{}\n'.format(self.q_table.quads, self.q_table.ranges))
             #self.log.write('{}\n'.format(self.q_table.table))
 
-    def observe(self, mobs=None):
-        target, flee = super().observe(mobs=mobs)
-        
-        if self.log:
-            target_p = target if target == None else (target.serial, target.alive)
-            flee_p = flee if flee == None else flee.serial
-            self.log.write('\ntarget: {}  | flee: {}\n'.format(target_p, flee_p))
-        
-        return (target, flee)
     
-    def action(self, epsilon=0, observation=None):
+    def action(self, epsilon=0, q_key=None):
         # movement logging for debugging
-        mx, my, choice, q_key = super().action(epsilon=epsilon, observation=observation)  #t, r debug
+        mx, my, choice = super().action(epsilon=epsilon, q_key=q_key)  #t, r debug
         
         if self.log:
-            #self.log.write('choice: {:<2}  |  move: ({:>6}, {:>6})\n'.format(choice, round(mx, 2), round(my, 2)))
-            self.log.write('ds = {}  |  q_key: {}\n'.format(round((mx**2 +my**2)**.5, 2), q_key))
+            self.log.write('choice: {:<2}  |  move: ({:>6}, {:>6})\n'.format(choice, round(mx, 2), round(my, 2)))
             #self.log.write('angles: {}  |  ranges: {}\n'.format(t, r))
             
-        return mx, my, choice, q_key
+        return mx, my, choice
 
     def check(self, mobs=None, mx=0, my=0):
-        reward, eaten_mobs = super().check(mobs=mobs, mx=mx, my=my)
+        eaten_mobs, reward = super().check(mobs=mobs, mx=mx, my=my)
         
         if len(eaten_mobs) > 0 and self.log:
             self.log.write('** ATE: {}\n'.format(eaten_mobs))
         
-        return reward, eaten_mobs
+        return eaten_mobs, reward

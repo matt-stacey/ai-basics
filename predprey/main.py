@@ -1,4 +1,4 @@
-# much inspiration from sentdex, sspecially
+# much inspiration from sentdex, especially
 # https://pythonprogramming.net/own-environment-q-learning-reinforcement-learning-python-tutorial/?completed=/q-learning-analysis-reinforcement-learning-python-tutorial/
 
 
@@ -7,9 +7,10 @@ import time
 import random
 import os
 import numpy as np
+import matplotlib.pyplot as plt
 
-import resources.colors as colors
 from resources.mobs import Predator, Prey, Food
+
 
 pygame.init()
 
@@ -18,22 +19,28 @@ RES = 'resources'
 LOG = open(os.path.join(RES, 'game.log'), 'w')
 
 # pygame setup
-WIDTH = 400  # 1080
-HEIGHT = 400  # 800
+WIDTH = 600  # 1080
+HEIGHT = 600  # 800
 gameDisplay = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 FPS = 30
 
 # Q learning variables
-EPISODES = 21
+EPISODES = 11  # 22500  # with epsilon decay rate at 0.9998, this corresponds to <1% random moves
 SHOW = 10  # how often to visualize
 FRAMES = 200  # per episode
 EPSILON = 0.9  # random action threshhold
 DECAY_RATE = 0.9998  # espilon *= DECAY_RATE
 
-# existing Q tables
-PREY_TABLE = False
-PRED_TABLE = False
+# load/save Q tables
+TABLES = 'q_tables'
+PREY_TABLE = False  # os.path.join(RES, TABLES, 'Prey-7965313.Q')
+PRED_TABLE = False  # os.path.join(RES, TABLES, 'Predator-8637585.Q')
+SAVE_Q = False
+
+# colors
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
 
 
 def init_mobs(food=0, prey=(0, False), pred=(0, False)):
@@ -52,13 +59,14 @@ def init_mobs(food=0, prey=(0, False), pred=(0, False)):
     for p in range(pred[0]):
         mobs['Predator'].append(Predator(x=0, y=0, dims=dims, load=pred[1]))
     
+    print('\n' + '='*60 + '\n')
     return mobs
 
 
 def display_stats(episode, frame, mobs):
     font = pygame.font.SysFont(None, 32)
     
-    text = font.render('episode/frame: {}/{}'.format(episode, frame), True, colors.white)
+    text = font.render('episode/frame: {}/{}'.format(episode, frame), True, WHITE)
     gameDisplay.blit(text,(0, 0))
     
     for num, key in enumerate(mobs.keys()):
@@ -67,7 +75,7 @@ def display_stats(episode, frame, mobs):
         for mob in mobs[key]:
             tally = tally + 1 if mob.alive else tally  # FIXME add rewards (avg?)
         message = '{}: {}/{}'.format(key, tally, total)
-        text = font.render(message, True, colors.white)
+        text = font.render(message, True, WHITE)
         gameDisplay.blit(text,(0, (num+1)*40))
 
 
@@ -96,7 +104,7 @@ def exit_sim():
 
 def run():
     
-    mobs = init_mobs(food=40, prey=(5, PREY_TABLE), pred=(1, PRED_TABLE))
+    mobs = init_mobs(food=64, prey=(8, PREY_TABLE), pred=(1, PRED_TABLE))
 
     epsilon = EPSILON
 
@@ -117,17 +125,18 @@ def run():
         
         # run the episode
         for k in range(FRAMES):
-            gameDisplay.fill(colors.black)
+            gameDisplay.fill(BLACK)
             
             # update all mobs
             for mob_type, mob_list in mobs.items():
                 for mob in mob_list:
                     if mob.alive:
-                        observation = mob.observe(mobs=mobs)  # find the closest food/prey/predator
-                        mx, my, _, _ = mob.action(epsilon=epsilon, observation=observation)  # take an action
-                        reward, _ = mob.check(mobs=mobs, mx=mx, my=my)  # check to see what has happened
-                        rewards[mob][episode] += reward
+                        q_key = mob.observe(mobs=mobs)  # find the closest food/prey/predator
+                        mx, my, _ = mob.action(epsilon=epsilon, q_key=q_key)  # take an action
+                        _, reward = mob.check(mobs=mobs, mx=mx, my=my)  # check to see what has happened
                         mob.update_q()  # learn from what mob did
+
+                        rewards[mob][episode] += (reward[0] + reward[1])  # tally for episode rewards
 
             # display all mobs
             if show_this:
@@ -147,6 +156,14 @@ def run():
         # clean up the episode
         episode_cleanup(episode, mobs, rewards)
         epsilon *= DECAY_RATE
+
+    if SAVE_Q:
+        for mob_type, mob_list in mobs.items():
+            if mob_type != 'Food':
+                for mob in mob_list:
+                    mob.q_table.save(os.path.join(RES, TABLES), mob_type, mob.serial)
+    else:
+        print('Q table saving disabled')
 
     plot_rewards(rewards)
 
