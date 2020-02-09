@@ -19,15 +19,15 @@ RES = 'resources'
 LOG = open(os.path.join(RES, 'game.log'), 'w')
 
 # pygame setup
-WIDTH = 600  # 1080
-HEIGHT = 600  # 800
+WIDTH = 400  # 1080
+HEIGHT = 400  # 800
 gameDisplay = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 FPS = 30
 
 # Q learning variables
-EPISODES = 11  # 22500  # with epsilon decay rate at 0.9998, this corresponds to <1% random moves
-SHOW = 10  # how often to visualize
+EPISODES = 3600*4  # 22500  # with epsilon decay rate at 0.9998, this corresponds to <1% random moves
+SHOW = 1000  # how often to visualize
 FRAMES = 200  # per episode
 EPSILON = 0.9  # random action threshhold
 DECAY_RATE = 0.9998  # espilon *= DECAY_RATE
@@ -36,7 +36,10 @@ DECAY_RATE = 0.9998  # espilon *= DECAY_RATE
 TABLES = 'q_tables'
 PREY_TABLE = False  # os.path.join(RES, TABLES, 'Prey-7965313.Q')
 PRED_TABLE = False  # os.path.join(RES, TABLES, 'Predator-8637585.Q')
-SAVE_Q = False
+SAVE_Q = True
+
+# plotting
+PLOTS = 'plots'
 
 # colors
 WHITE = (255, 255, 255)
@@ -84,12 +87,22 @@ def episode_cleanup(episode, mobs, rewards):
     for mob_type, mob_list in mobs.items():
         if mob_type != 'Food':
             for mob in mob_list:
-                print('{} {}: {}'.format(mob.__class__, mob.serial, rewards[mob][episode]))
+                print('{} {:>8}: {:<9} ({})'.format(mob.__class__, mob.serial, round(rewards[mob][episode], 3), mob.alive))
     print('\n' + '='*60 + '\n')
 
 
-def plot_rewards(rewards):
-    pass
+def plot_rewards(mobs=None, rewards=None):
+    for mob_type, mob_list in mobs.items():
+        if mob_type != 'Food':
+            for mob in mob_list:
+                plt.plot(rewards[mob], label='{}:{}'.format(mob_type, mob.serial))
+    plt.xlabel('Episode')
+    plt.ylabel('Reward')
+    plt.legend()
+    fig_name = os.path.join(RES, PLOTS, '{}.png'.format(int(time.time())))
+    print('Saving episode rewards plot as {}'.format(fig_name))
+    plt.savefig(fig_name)
+    plt.close()
 
 
 def exit_sim():
@@ -99,7 +112,6 @@ def exit_sim():
     #LOG.close()
     time.sleep(fade_out)
     pygame.quit()
-    #quit()
 
 
 def run():
@@ -132,9 +144,9 @@ def run():
                 for mob in mob_list:
                     if mob.alive:
                         q_key = mob.observe(mobs=mobs)  # find the closest food/prey/predator
-                        mx, my, _ = mob.action(epsilon=epsilon, q_key=q_key)  # take an action
-                        _, reward = mob.check(mobs=mobs, mx=mx, my=my)  # check to see what has happened
-                        mob.update_q(mobs=mobs, q_key=q_key, reward=reward)  # learn from what mob did
+                        mx, my, choice = mob.action(epsilon=epsilon, q_key=q_key)  # take an action
+                        reward, _ = mob.check(mobs=mobs, mx=mx, my=my)  # check to see what has happened
+                        mob.update_q(mobs=mobs, q_key=q_key, choice=choice, reward=reward)  # learn from what mob did
 
                         rewards[mob][episode] += (reward[0] + reward[1])  # tally for episode rewards
 
@@ -165,12 +177,14 @@ def run():
     else:
         print('Q table saving disabled')
 
-    plot_rewards(rewards)
+    return mobs, rewards
 
 
 def main():
-    run()
+    mobs, rewards = run()
     exit_sim()
+    plot_rewards(mobs=mobs, rewards=rewards)
+
 
 if __name__ == '__main__':
     import traceback
@@ -183,4 +197,5 @@ if __name__ == '__main__':
         tb = 'no error'
     finally:
         LOG.write('{}\n'.format(tb))
+        LOG.write('End!')
         LOG.close()

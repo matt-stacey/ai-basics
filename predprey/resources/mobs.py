@@ -282,7 +282,7 @@ class Mob():
                     if mob.alive and ds < (self.r + mob.r):
                         # eat the prey/food, be rewarded
                         self.health += mob.health
-                        act_reward = mob.health ** 2
+                        act_reward += mob.health ** 2
                         self.target[1] = None
                         mob.health = 0
                         mob.alive = False
@@ -292,19 +292,25 @@ class Mob():
                     ds = distance(mob - self)
                     if mob.alive and ds < (self.r + mob.r):
                         # pentalty for being eaten
-                        act_reward = self.health ** 2
+                        act_reward -= (self.health ** 2)
         
         reward = (move_reward, act_reward)
-        return eaten_mobs, reward
+        return reward, eaten_mobs
 
-    def update_q(self, mobs=None, q_key=((None, None), (None, None)), reward=0):
-        return  # FIXME implement
-        current_q = self.q_table.table[q_key]
+    def update_q(self, mobs=None, q_key=((None, None), (None, None)), choice=-1, reward=0):
+        current_q = self.q_table.table[q_key][choice]
 
         new_q_key = self.observe(mobs=mobs)  # sentdex for advice
         max_future_q = np.max(self.q_table.table[new_q_key])
 
         move_reward, act_reward = reward
+        reward_sum = move_reward + act_reward
+        if act_reward > 0:  # eating
+            new_q = act_reward
+        else:
+            new_q = (1 - self.learning_rate) * current_q + self.learning_rate * (reward_sum + self.discount * max_future_q)
+
+        self.q_table.table[q_key][choice] = new_q
         
     def display(self, gameDisplay=None):
         if gameDisplay:
@@ -367,7 +373,7 @@ class Food(Mob):
         self.health += 0.2  # grow!
         return 0, 0, 0
     def check(self, *args, **kwargs):
-        return 0, (0,0)
+        return (0,0), []
     def update_q(self, *args, **kwargs):
         pass
 
@@ -453,9 +459,9 @@ class Predator(Mob):
         return mx, my, choice
 
     def check(self, mobs=None, mx=0, my=0):
-        eaten_mobs, reward = super().check(mobs=mobs, mx=mx, my=my)
+        reward, eaten_mobs = super().check(mobs=mobs, mx=mx, my=my)
         
         if len(eaten_mobs) > 0 and self.log:
             self.log.write('** ATE: {}\n'.format(eaten_mobs))
         
-        return eaten_mobs, reward
+        return reward, eaten_mobs
