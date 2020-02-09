@@ -6,6 +6,7 @@ import pygame
 import time
 import random
 import os
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -181,7 +182,19 @@ def run():
 
 
 def main():
-    mobs, rewards = run()
+    parser = argparse.ArgumentParser(description='''Predator/Prey AI Trainer and Visualizer''')
+    
+    parser.add_argument('-m', '--mode',
+                        help='training/execution mode for AI',
+                        default='run')
+                        
+    # mob selection
+    
+    
+    args = parser.parse_args()
+    
+    if args.mode == 'run':
+        mobs, rewards = run()
     exit_sim()
     plot_rewards(mobs=mobs, rewards=rewards)
 
