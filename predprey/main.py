@@ -26,7 +26,7 @@ gameDisplay = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 FPS = 30
 
-# Q learning variables
+# Q learning variables [DEFAULTS]
 EPISODES = 1000  # 22500  # with epsilon decay rate at 0.9998, this corresponds to <1% random moves
 SHOW = 1000  # how often to visualize
 FRAMES = 300  # per episode
@@ -45,6 +45,20 @@ PLOTS = 'plots'
 # colors
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
+
+
+def sim_init(food=0, prey=0, pred=0):
+
+    mobs = init_mobs(food=food, prey=(prey, PREY_TABLE), pred=(pred, PRED_TABLE))
+
+    epsilon = EPSILON
+
+    rewards = {}
+    for mob_type, mob_list in mobs.items():
+        for mob in mob_list:
+            rewards[mob] = [ 0 ] * EPISODES
+
+    return mobs, epsilon, rewards
 
 
 def init_mobs(food=0, prey=(0, False), pred=(0, False)):
@@ -110,21 +124,92 @@ def exit_sim():
     fade_out = 1
     pygame.mixer.music.fadeout(fade_out * 1000)
     LOG.write('\nExiting normally!\n')
-    #LOG.close()
+    #LOG.close()   # FIXME when you remove traceback
     time.sleep(fade_out)
     pygame.quit()
 
 
-def run():
-    
-    mobs = init_mobs(food=100, prey=(1, PREY_TABLE), pred=(0, PRED_TABLE))
+def train(food=0, prey=(0, False), pred=0):
+    mobs, epsilon, rewards = sim_init(food=food, prey=prey[0], pred=pred)
 
-    epsilon = EPSILON
-
-    rewards = {}
+    allow_prey_movement = prey[1]
+    valued_customer = 'Prey' if allow_prey_movement else 'Predator'
+    screen_size = 1
     for mob_type, mob_list in mobs.items():
         for mob in mob_list:
-            rewards[mob] = [ 0 ] * EPISODES
+            if mob.sight > screen_size:
+                screen_size = mob.sight
+    screen_size = int(screen_size * 3)  # radius, but we don't want tangents at edges
+    pygame.display.set_mode((screen_size, screen_size))
+    for mob_type, mob_list in mobs.items():
+        for mob in mob_list:
+            mob.max_x = screen_size
+            mob.max_y = screen_size
+
+    for episode in range(EPISODES):
+        show_this = True if episode % SHOW == 0 else False
+        end_ep = False
+        
+        # reset all the mobs for this episode
+        for mob_type, mob_list in mobs.items():
+            for mob in mob_list:
+                x = random.randint(0, screen_size)
+                y = random.randint(0, screen_size)
+                if mob_type == valued_customer:
+                    x = screen_size / 2  # centered
+                    y = screen_size / 2
+                mob.reset(x=x, y=y)
+
+        # run the episode
+        for k in range(FRAMES):
+            gameDisplay.fill(BLACK)
+            
+            # update mob under training
+            for mob in mobs[valued_customer]:
+                q_key = mob.observe(mobs=mobs)  # find the closest food/prey/predator
+                mx, my, choice = mob.action(epsilon=epsilon, q_key=q_key)  # take an action
+                reward, _ = mob.check(mobs=mobs, mx=mx, my=my)  # check to see what has happened
+                mob.update_q(mobs=mobs, q_key=q_key, choice=choice, reward=reward)  # learn from what mob did
+
+                rewards[mob][episode] += (reward[0] + reward[1])  # tally for episode rewards
+                else:
+                    end_ep = True  # die when one of the mobs does
+
+            # display all mobs
+            if show_this:
+                for mob_type, mob_list in mobs.items():
+                    for mob in mob_list:
+                        if mob.alive:
+                            mob.display(gameDisplay)
+            
+            # complete the render and wait to cycle
+            display_stats(episode, k+1, mobs)
+            pygame.display.update()
+            if show_this:
+                clock.tick(FPS)  # no need to wait if we aren't visualizing
+            else:
+                clock.tick(10**10)
+
+            if end_ep:
+                if show_this:
+                    time.sleep(1)  # pause at the end state
+                break
+
+        # clean up the episode
+        episode_cleanup(episode, mobs, rewards)
+        epsilon *= DECAY_RATE
+
+    if SAVE_Q:
+        for mob in mobs[valued_customer]:
+            mob.q_table.save(os.path.join(RES, TABLES), valued_customer, mob.serial)
+    else:
+        print('Q table saving disabled')
+
+    return mobs, rewards
+
+
+def run(food=0, prey=0, pred=0):
+    mobs, epsilon, rewards = sim_init(food=food, prey=prey, pred=pred)
     
     for episode in range(EPISODES):
         show_this = True if episode % SHOW == 0 else False
@@ -183,20 +268,55 @@ def run():
 
 def main():
     parser = argparse.ArgumentParser(description='''Predator/Prey AI Trainer and Visualizer''')
-    
-    parser.add_argument('-m', '--mode',
-                        help='training/execution mode for AI',
-                        default='run')
-                        
+
+    parser.add_argument('-m', '--mode', help='training/execution mode for AI', default='run')
+
     # mob selection
-    
-    
+    parser.add_argument('--pred', help='number of predator mobs', default=0)
+    parser.add_argument('--prey', help='number of prey mobs', default=1)
+    parser.add_argument('--food', help='number of food mobs', default=100)
+
+    # load/save mob q_tables
+    parser.add_argument('--q_pred', help='pre-generated predator Q table', default=False)
+    parser.add_argument('--q_prey', help='pre-generated prey Q table', default=False)
+    parser.add_argument('--save_q', help='save final Q tables', dest='save_q', action='store_true')
+    parser.set_defaults(save_q=False)
+    parser.add_argument('--no-plot', help='don\'t plot episode rewards', dest='plot_rew', action='store_false')
+    parser.set_defaults(plot_rew=True)
+
+    # training variables
+    parser.add_argument('--episodes', help='number of training episodes', default=EPISODES)
+    parser.add_argument('--show', help='regularity to visualize environment', default=SHOW)
+    parser.add_argument('--frames', help='steps per training episode', default=FRAMES)
+    parser.add_argument('--epsilon', help='random decision threshold', default=EPSILON)
+    parser.add_argument('--decay', help='random decision threshold decay rate', default=DECAY_RATE)
+
     args = parser.parse_args()
-    
-    if args.mode == 'run':
-        mobs, rewards = run()
+    mobs = None
+    rewards = None
+
+    globals()['PREY_TABLE'] = False if not args.q_prey else os.path.join(RES, TABLES, args.q_prey)
+    globals()['PRED_TABLE'] = False if not args.q_pred else os.path.join(RES, TABLES, args.q_pred)
+    globals()['SAVE_Q'] = args.save_q
+
+    globals()['EPISODES'] = int(args.episodes)
+    globals()['SHOW'] = int(args.show)
+    globals()['FRAMES'] = int(args.frames)
+    globals()['EPSILON'] = int(args.epsilon)
+    globals()['DECAY_RATE'] = int(args.decay)
+
+    if args.mode == 'pred':
+        mobs, rewards = train(food=0, prey=(1, False), pred=1)  # train the predator Q table
+    elif args.mode == 'prey':
+        mobs, rewards = train(food=1, prey=(1, True), pred=0)  # train the prey Q table (target)
+    elif args.mode == 'evade':
+        mobs, rewards = train(food=0, prey=(1, True), pred=1)  # train the prey Q table (flee)
+    else:
+        mobs, rewards = run(food=int(args.food), prey=int(args.prey), pred=int(args.pred))
+
     exit_sim()
-    plot_rewards(mobs=mobs, rewards=rewards)
+    if plot_rew:
+        plot_rewards(mobs=mobs, rewards=rewards)
 
 
 if __name__ == '__main__':
