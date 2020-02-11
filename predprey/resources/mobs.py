@@ -101,6 +101,8 @@ class Q_table():
 
 
 class Mob():
+    sight = 0
+    
     def __init__(self, x=None, y=None, dims=None):
         if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
             raise ValueError('Mob not passed position in init!')
@@ -121,7 +123,7 @@ class Mob():
         self.target = [None, None]
         self.flee = [None, None]
         
-        self.sight = 0
+        #self.sight = 0
         self.slices = 0
         self.speed = (0, 0)
         self.moves = [(self.x, self.y)]
@@ -380,6 +382,8 @@ class Food(Mob):
 
 
 class Prey(Mob):
+    sight = 60
+    
     def __init__(self, x=None, y=None, dims=None, load=False):
         if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
             raise ValueError('Prey not passed position in init!')
@@ -394,7 +398,7 @@ class Prey(Mob):
         self.target = ['Food', None]  # type, mob
         self.flee = ['Predator', None]
         
-        self.sight = 60
+        #self.sight = 60
         self.bands = 4
         self.slices = 8
         self.speed = (2, 6)  # wander, run
@@ -412,6 +416,8 @@ class Prey(Mob):
 
 
 class Predator(Mob):
+    sight = 200
+    
     def __init__(self, x=None, y=None, dims=None, load=False):
         if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
             raise ValueError('Predator not passed position in init!')
@@ -425,7 +431,7 @@ class Predator(Mob):
         
         self.target = ['Prey', None]
         
-        self.sight = 200
+        #self.sight = 200
         self.bands = 8
         self.slices = 16
         self.speed = (4, 10)

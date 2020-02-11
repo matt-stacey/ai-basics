@@ -66,7 +66,7 @@ def init_mobs(food=0, prey=(0, False), pred=(0, False)):
             'Prey': [],
             'Predator': [],
            }
-    dims = (WIDTH, HEIGHT)
+    dims = pygame.display.get_window_size()
     
     for f in range(food):
         mobs['Food'].append(Food(x=0, y=0, dims=dims))
@@ -130,21 +130,18 @@ def exit_sim():
 
 
 def train(food=0, prey=(0, False), pred=0):
-    mobs, epsilon, rewards = sim_init(food=food, prey=prey[0], pred=pred)
 
     allow_prey_movement = prey[1]
     valued_customer = 'Prey' if allow_prey_movement else 'Predator'
+    
+    # set a sceen wize to just larger than the mob can see
     screen_size = 1
-    for mob_type, mob_list in mobs.items():
-        for mob in mob_list:
-            if mob.sight > screen_size:
-                screen_size = mob.sight
+    for mob_type in (Predator, Prey, Food):
+        if mob_type.sight > screen_size:
+            screen_size = mob_type.sight
     screen_size = int(screen_size * 3)  # radius, but we don't want tangents at edges
     pygame.display.set_mode((screen_size, screen_size))
-    for mob_type, mob_list in mobs.items():
-        for mob in mob_list:
-            mob.max_x = screen_size
-            mob.max_y = screen_size
+    mobs, epsilon, rewards = sim_init(food=food, prey=prey[0], pred=pred)
 
     for episode in range(EPISODES):
         show_this = True if episode % SHOW == 0 else False
@@ -164,16 +161,19 @@ def train(food=0, prey=(0, False), pred=0):
         for k in range(FRAMES):
             gameDisplay.fill(BLACK)
             
-            # update mob under training
-            for mob in mobs[valued_customer]:
-                q_key = mob.observe(mobs=mobs)  # find the closest food/prey/predator
-                mx, my, choice = mob.action(epsilon=epsilon, q_key=q_key)  # take an action
-                reward, _ = mob.check(mobs=mobs, mx=mx, my=my)  # check to see what has happened
-                mob.update_q(mobs=mobs, q_key=q_key, choice=choice, reward=reward)  # learn from what mob did
-
-                rewards[mob][episode] += (reward[0] + reward[1])  # tally for episode rewards
-                else:
-                    end_ep = True  # die when one of the mobs does
+            # update mobs
+            for mob_type, mob_list in mobs.items():
+                for mob in mob_list:
+                    update_this = True if (allow_prey_movement and mob_type == 'Prey') or mob_type == 'Predator' else False
+                    if mob.alive and update_this:
+                        q_key = mob.observe(mobs=mobs)  # find the closest food/prey/predator
+                        mx, my, choice = mob.action(epsilon=epsilon, q_key=q_key)  # take an action
+                        reward, _ = mob.check(mobs=mobs, mx=mx, my=my)  # check to see what has happened
+                        mob.update_q(mobs=mobs, q_key=q_key, choice=choice, reward=reward)  # learn from what mob did
+        
+                        rewards[mob][episode] += (reward[0] + reward[1])  # tally for episode rewards
+                    elif not mob.alive:
+                        end_ep = True  # die when one of the mobs does
 
             # display all mobs
             if show_this:
@@ -315,7 +315,7 @@ def main():
         mobs, rewards = run(food=int(args.food), prey=int(args.prey), pred=int(args.pred))
 
     exit_sim()
-    if plot_rew:
+    if args.plot_rew:
         plot_rewards(mobs=mobs, rewards=rewards)
 
 
