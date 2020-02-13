@@ -66,7 +66,7 @@ def init_mobs(food=0, prey=(0, False), pred=(0, False)):
             'Prey': [],
             'Predator': [],
            }
-    dims = pygame.display.get_window_size()
+    dims = (WIDTH, HEIGHT)  # can be reset during training
     
     for f in range(food):
         mobs['Food'].append(Food(x=0, y=0, dims=dims))
@@ -135,12 +135,9 @@ def train(food=0, prey=(0, False), pred=0):
     valued_customer = 'Prey' if allow_prey_movement else 'Predator'
     
     # set a sceen wize to just larger than the mob can see
-    screen_size = 1
-    for mob_type in (Predator, Prey, Food):
-        if mob_type.sight > screen_size:
-            screen_size = mob_type.sight
-    screen_size = int(screen_size * 3)  # radius, but we don't want tangents at edges
-    pygame.display.set_mode((screen_size, screen_size))
+    WIDTH = int(Prey.sight * 1.5) if pred == 0 else int(Predator.sight * 1.5)
+    HEIGHT = WIDTH
+    pygame.display.set_mode((WIDTH, HEIGHT))
     mobs, epsilon, rewards = sim_init(food=food, prey=prey[0], pred=pred)
 
     for episode in range(EPISODES):
@@ -150,11 +147,11 @@ def train(food=0, prey=(0, False), pred=0):
         # reset all the mobs for this episode
         for mob_type, mob_list in mobs.items():
             for mob in mob_list:
-                x = random.randint(0, screen_size)
-                y = random.randint(0, screen_size)
+                x = random.randint(0, WIDTH)
+                y = random.randint(0, HEIGHT)
                 if mob_type == valued_customer:
-                    x = screen_size / 2  # centered
-                    y = screen_size / 2
+                    x = WIDTH / 2  # centered
+                    y = HEIGHT / 2
                 mob.reset(x=x, y=y)
 
         # run the episode
@@ -186,7 +183,7 @@ def train(food=0, prey=(0, False), pred=0):
             display_stats(episode, k+1, mobs)
             pygame.display.update()
             if show_this:
-                clock.tick(FPS)  # no need to wait if we aren't visualizing
+                clock.tick(FPS)
             else:
                 clock.tick(10**10)
 
@@ -202,6 +199,7 @@ def train(food=0, prey=(0, False), pred=0):
     if SAVE_Q:
         for mob in mobs[valued_customer]:
             mob.q_table.save(os.path.join(RES, TABLES), valued_customer, mob.serial)
+            mob.q_table.plot_q(os.path.join(RES, PLOTS, '{}_Q.png'.format(mob.serial)))
     else:
         print('Q table saving disabled')
 
@@ -247,7 +245,7 @@ def run(food=0, prey=0, pred=0):
             display_stats(episode, k+1, mobs)
             pygame.display.update()
             if show_this:
-                clock.tick(FPS)  # no need to wait if we aren't visualizing
+                clock.tick(FPS)
             else:
                 clock.tick(10**10)
 

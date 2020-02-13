@@ -3,6 +3,7 @@ import math
 import numpy as np
 import pickle
 import time
+import matplotlib.pyplot as plt
 
 try:
     import pygame_sdl2
@@ -92,6 +93,22 @@ class Q_table():
                 return num
                 
         return None
+
+    def plot_q(self, filename):
+        return
+        # one plot for each quad; one line for each range band
+        # x_axis: action, y-axis: q_value
+        n_figs = len(self.quads)
+        n_lines = len(self.ranges)
+
+        r, c = (1, 1)
+        fig, axes = plt.subplots(r, c, sharex=True, sharey=True)
+
+        plt.xlabel('Action')
+        plt.ylabel('q_value')
+        plt.legend()
+        plt.savefig(filename)  # needs to invlude directory structure
+        plt.close()
     
     def save(self, directory, mob_type, serial):
         filename = '{}/{}-{}.Q'.format(directory, mob_type, serial)
@@ -271,7 +288,7 @@ class Mob():
         return mx, my
         
     def check(self, mobs=None, mx=0, my=0):
-        FACTOR = 100
+        FACTOR = 10
         move_reward = -1  # turn penalty
         move_reward -= 1/2 * (mx**2 + my**2)  # move penalty
         act_reward = 0
@@ -319,7 +336,7 @@ class Mob():
         if gameDisplay:
             
             # show move history
-            if self.show_moves:
+            if self.show_moves and len(self.moves) > 0:
                 if self.show_moves == True:
                     start = 0
                 elif len(self.moves) < self.show_moves:
@@ -416,7 +433,7 @@ class Prey(Mob):
 
 
 class Predator(Mob):
-    sight = 200
+    sight = 100
     
     def __init__(self, x=None, y=None, dims=None, load=False):
         if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
