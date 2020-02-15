@@ -95,7 +95,6 @@ class Q_table():
         return None
 
     def plot_q(self, filename, tgt=True):
-        return
         # one plot for each quad; one line for each range band
         # x_axis: action, y-axis: q_value
         
@@ -105,7 +104,7 @@ class Q_table():
                 rc = i
                 break
         
-        fig, axes = plt.subplots(nrows= rc, ncols=rc, sharex=True, sharey=True, figsize=[1.8*rc, 1.8*rc])
+        fig, axes = plt.subplots(nrows= rc, ncols=rc, sharex=True, sharey=True, figsize=[3*rc, 3*rc])
         
         q = len(self.quads)
         for r in range(rc):
@@ -113,13 +112,16 @@ class Q_table():
                 q = c + r * rc
                 if q >= len(self.quads):
                     break
+                styles = ('D', 's', 'o', '+', 'x')
                 for l in range(len(self.ranges)):
                     key = ((q, l), (None, None)) if tgt else ((None, None), (q, l))
-                    axes[r, c].plot(self.table[key])
+                    fmt = '--{}'.format(styles[l])
+                    axes[r, c].plot(self.table[key], fmt, label=self.ranges[l])
+                if r == 0 and c == rc - 1:
+                    axes[r, c].legend()
+                    plt.xlabel('Action')
+                    plt.ylabel('q_value')
         
-        plt.xlabel('Action')
-        plt.ylabel('q_value')
-        plt.legend()
         plt.savefig(filename)  # needs to invlude directory structure
         plt.close()
     
