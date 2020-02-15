@@ -94,16 +94,29 @@ class Q_table():
                 
         return None
 
-    def plot_q(self, filename):
+    def plot_q(self, filename, tgt=True):
         return
         # one plot for each quad; one line for each range band
         # x_axis: action, y-axis: q_value
-        n_figs = len(self.quads)
-        n_lines = len(self.ranges)
-
-        r, c = (1, 1)
-        fig, axes = plt.subplots(r, c, sharex=True, sharey=True)
-
+        
+        rc = len(self.quads)
+        for i in range(1,20):
+            if i**2 > len(self.quads):
+                rc = i
+                break
+        
+        fig, axes = plt.subplots(nrows= rc, ncols=rc, sharex=True, sharey=True, figsize=[1.8*rc, 1.8*rc])
+        
+        q = len(self.quads)
+        for r in range(rc):
+            for c in range(rc):
+                q = c + r * rc
+                if q >= len(self.quads):
+                    break
+                for l in range(len(self.ranges)):
+                    key = ((q, l), (None, None)) if tgt else ((None, None), (q, l))
+                    axes[r, c].plot(self.table[key])
+        
         plt.xlabel('Action')
         plt.ylabel('q_value')
         plt.legend()
