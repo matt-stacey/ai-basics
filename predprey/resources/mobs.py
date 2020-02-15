@@ -97,7 +97,7 @@ class Q_table():
     def plot_q(self, filename, tgt=True):
         # one plot for each quad; one line for each range band
         # x_axis: action, y-axis: q_value
-        
+        print('Plotting Q table {}'.format(filename))
         rc = len(self.quads)
         for i in range(1,20):
             if i**2 >= len(self.quads):
@@ -105,7 +105,6 @@ class Q_table():
                 break
         
         fig, axes = plt.subplots(nrows= rc, ncols=rc, sharex=True, sharey=True, figsize=[3*rc, 3*rc])
-        print(len(self.ranges))
         
         q = len(self.quads)
         for r in range(rc):
@@ -307,9 +306,9 @@ class Mob():
         return mx, my
         
     def check(self, mobs=None, mx=0, my=0):
-        FACTOR = 10
+        FACTOR = 0.5
         move_reward = -1  # turn penalty
-        move_reward -= 1/2 * (mx**2 + my**2)  # move penalty
+        move_reward -= (mx**2 + my**2) ** 0.5  # move penalty
         act_reward = 0
 
         eaten_mobs = []
@@ -321,7 +320,7 @@ class Mob():
                     if mob.alive and ds < (self.r + mob.r):
                         # eat the prey/food, be rewarded
                         self.health += mob.health
-                        act_reward += mob.health_init ** 2 * FACTOR
+                        act_reward += (mob.health_init * FACTOR)
                         self.target[1] = None
                         mob.health = 0
                         mob.alive = False
@@ -331,7 +330,7 @@ class Mob():
                     ds = distance(mob - self)
                     if mob.alive and ds < (self.r + mob.r):
                         # pentalty for being eaten
-                        act_reward -= (self.health_init ** 2) * FACTOR
+                        act_reward -= (self.health_init * FACTOR)
         
         reward = (move_reward, act_reward)
         return reward, eaten_mobs

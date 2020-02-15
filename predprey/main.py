@@ -126,12 +126,7 @@ def exit_sim():
     LOG.write('\nExiting normally!\n')
     #LOG.close()   # FIXME when you remove traceback
     time.sleep(fade_out)
-    print('quit pygame display')
-    try:
-        pygame.display.quit()
-    except Exception as e:
-        print('{} occurred')
-    print('quit pygame')
+    pygame.display.quit()
     pygame.quit()
 
 
@@ -205,7 +200,6 @@ def train(food=0, prey=(0, False), pred=0):
     if SAVE_Q:
         for mob in mobs[valued_customer]:
             mob.q_table.save(os.path.join(RES, TABLES), valued_customer, mob.serial)
-            mob.q_table.plot_q(os.path.join(RES, PLOTS, '{}_Q.png'.format(mob.serial)))  # seg fault in this block
     else:
         print('Q table saving disabled')
 
@@ -306,8 +300,8 @@ def main():
     globals()['EPISODES'] = int(args.episodes)
     globals()['SHOW'] = int(args.show)
     globals()['FRAMES'] = int(args.frames)
-    globals()['EPSILON'] = int(args.epsilon)
-    globals()['DECAY_RATE'] = int(args.decay)
+    globals()['EPSILON'] = float(args.epsilon)
+    globals()['DECAY_RATE'] = float(args.decay)
 
     if args.mode == 'pred':
         mobs, rewards = train(food=0, prey=(1, False), pred=1)  # train the predator Q table
@@ -319,6 +313,9 @@ def main():
         mobs, rewards = run(food=int(args.food), prey=int(args.prey), pred=int(args.pred))
 
     exit_sim()
+    for mob_type in ('Prey', 'Predator'):  # 'Food' has no q_table
+        for mob in mobs[mob_type]:
+            mob.q_table.plot_q(os.path.join(RES, PLOTS, '{}_Q.png'.format(mob.serial)))  # moving out of game loop removed seg fault
 
     if args.plot_rew:
         plot_rewards(mobs=mobs, rewards=rewards)
@@ -336,3 +333,4 @@ if __name__ == '__main__':
         LOG.write('{}\n'.format(tb))
         LOG.write('End!')
         LOG.close()
+    print('Exiting main() with {}'.format(tb))
