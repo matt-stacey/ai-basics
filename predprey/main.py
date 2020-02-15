@@ -27,9 +27,9 @@ clock = pygame.time.Clock()
 FPS = 30
 
 # Q learning variables [DEFAULTS]
-EPISODES = 1000  # 22500  # with epsilon decay rate at 0.9998, this corresponds to <1% random moves
-SHOW = 1000  # how often to visualize
-FRAMES = 300  # per episode
+EPISODES = 100  # 22500  # with epsilon decay rate at 0.9998, this corresponds to <1% random moves
+SHOW = 10  # how often to visualize
+FRAMES = 200  # per episode
 EPSILON = 0.9  # random action threshhold
 DECAY_RATE = 0.999#8  # espilon *= DECAY_RATE
 
@@ -126,6 +126,12 @@ def exit_sim():
     LOG.write('\nExiting normally!\n')
     #LOG.close()   # FIXME when you remove traceback
     time.sleep(fade_out)
+    print('quit pygame display')
+    try:
+        pygame.display.quit()
+    except Exception as e:
+        print('{} occurred')
+    print('quit pygame')
     pygame.quit()
 
 
@@ -153,7 +159,7 @@ def train(food=0, prey=(0, False), pred=0):
                     x = WIDTH / 2  # centered
                     y = HEIGHT / 2
                 mob.reset(x=x, y=y)
-
+        
         # run the episode
         for k in range(FRAMES):
             gameDisplay.fill(BLACK)
@@ -199,7 +205,7 @@ def train(food=0, prey=(0, False), pred=0):
     if SAVE_Q:
         for mob in mobs[valued_customer]:
             mob.q_table.save(os.path.join(RES, TABLES), valued_customer, mob.serial)
-            mob.q_table.plot_q(os.path.join(RES, PLOTS, '{}_Q.png'.format(mob.serial)))
+            mob.q_table.plot_q(os.path.join(RES, PLOTS, '{}_Q.png'.format(mob.serial)))  # seg fault in this block
     else:
         print('Q table saving disabled')
 
@@ -313,19 +319,19 @@ def main():
         mobs, rewards = run(food=int(args.food), prey=int(args.prey), pred=int(args.pred))
 
     exit_sim()
+
     if args.plot_rew:
         plot_rewards(mobs=mobs, rewards=rewards)
 
 
 if __name__ == '__main__':
     import traceback
+    tb = 'no error'
     try:
         main()  # FIXME just run this
     except Exception as e:
         LOG.write('{}\n'.format(e))
         tb = traceback.format_exc()
-    else:
-        tb = 'no error'
     finally:
         LOG.write('{}\n'.format(tb))
         LOG.write('End!')

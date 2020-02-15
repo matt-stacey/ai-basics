@@ -100,11 +100,12 @@ class Q_table():
         
         rc = len(self.quads)
         for i in range(1,20):
-            if i**2 > len(self.quads):
+            if i**2 >= len(self.quads):
                 rc = i
                 break
         
         fig, axes = plt.subplots(nrows= rc, ncols=rc, sharex=True, sharey=True, figsize=[3*rc, 3*rc])
+        print(len(self.ranges))
         
         q = len(self.quads)
         for r in range(rc):
@@ -112,10 +113,13 @@ class Q_table():
                 q = c + r * rc
                 if q >= len(self.quads):
                     break
-                styles = ('D', 's', 'o', '+', 'x')
+                styles = ('D', 's', 'o', '+', 'x', '*', '.')
                 for l in range(len(self.ranges)):
                     key = ((q, l), (None, None)) if tgt else ((None, None), (q, l))
-                    fmt = '--{}'.format(styles[l])
+                    f = l
+                    while f > len(styles) - 1:
+                        f -= len(styles)  # there is probably a better way to do this...intertools.cycle?
+                    fmt = '--{}'.format(styles[f])
                     axes[r, c].plot(self.table[key], fmt, label=self.ranges[l])
                 if r == 0 and c == rc - 1:
                     axes[r, c].legend()
