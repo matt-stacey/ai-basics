@@ -120,10 +120,11 @@ class Q_table():
                         f -= len(styles)  # there is probably a better way to do this...intertools.cycle?
                     fmt = '--{}'.format(styles[f])
                     axes[r, c].plot(self.table[key], fmt, label=self.ranges[l])
-                if r == 0 and c == rc - 1:
-                    axes[r, c].legend()
-                    plt.xlabel('Action')
-                    plt.ylabel('q_value')
+                    axes[r,c].set_title(self.quads[q])
+        
+        axes[0, rc-1].legend()
+        plt.xlabel('Action')
+        plt.ylabel('q_value')
         
         plt.savefig(filename)  # needs to invlude directory structure
         plt.close()
