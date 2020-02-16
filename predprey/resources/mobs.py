@@ -23,7 +23,7 @@ def angle(coords=(0,0)):
     x, y = coords
     
     r2d = 180 / np.pi
-    ang = np.arctan2(x, 0-y) * r2d
+    ang = np.arctan2(x, -1*y) * r2d
     
     return ang
 
@@ -254,19 +254,19 @@ class Mob():
         if choice == 17:
             choice = random.randint(0,16)
 
-        # north/south component
-        if choice in (8, 1, 2, 16, 9, 10):
-            dx = -1  # flipped for pixels!
-        elif choice in (4, 5, 6, 12, 13, 14):
+        # east/west component
+        if choice in (2, 3, 4, 10, 11, 12):
             dx = 1
+        elif choice in (6, 7, 8, 14, 15, 16):
+            dx = -1
         else:
             dx = 0
         
-        # east/west component
-        if choice in (2, 3, 4, 10, 11, 12):
+        # north/south component
+        if choice in (8, 1, 2, 16, 9, 10):
+            dy = -1  # flipped for pixels!
+        elif choice in (4, 5, 6, 12, 13, 14):
             dy = 1
-        elif choice in (6, 7, 8, 14, 15, 16):
-            dy = -1
         else:
             dy = 0
         
@@ -306,7 +306,7 @@ class Mob():
         return mx, my
         
     def check(self, mobs=None, mx=0, my=0):
-        FACTOR = 0.5
+        FACTOR = 1
         move_reward = -1  # turn penalty
         move_reward -= (mx**2 + my**2) ** 0.5  # move penalty
         act_reward = 0
