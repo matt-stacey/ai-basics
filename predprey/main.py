@@ -28,10 +28,10 @@ FPS = 30
 
 # Q learning variables [DEFAULTS]
 EPISODES = 100  # 22500  # with epsilon decay rate at 0.9998, this corresponds to <1% random moves
-SHOW = 10  # how often to visualize
-FRAMES = 200  # per episode
+SHOW = 100  # how often to visualize
+FRAMES = 100  # per episode
 EPSILON = 0.9  # random action threshhold
-DECAY_RATE = 0.999#8  # espilon *= DECAY_RATE
+DECAY_RATE = 0.9998  # espilon *= DECAY_RATE
 
 # load/save Q tables
 TABLES = 'q_tables'
@@ -267,7 +267,7 @@ def run(food=0, prey=0, pred=0):
 def main():
     parser = argparse.ArgumentParser(description='''Predator/Prey AI Trainer and Visualizer''')
 
-    parser.add_argument('-m', '--mode', help='training/execution mode for AI', default='run')
+    parser.add_argument('-m', '--mode', help='training/execution mode for AI', default='prey')
 
     # mob selection
     parser.add_argument('--pred', help='number of predator mobs', default=0)

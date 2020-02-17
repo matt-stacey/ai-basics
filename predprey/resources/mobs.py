@@ -42,6 +42,7 @@ class Q_table():
         bands = int(bands) if bands >= 4 else 4  # range discrimination
         theta = 360 / slices
         half = theta / 2
+        self.actions = actions
         
         self.quads = [(i * theta - half, i * theta + half) for i in range(slices)]
         self.ranges = [(r * i / bands, r * (i+1) / bands) for i in range(bands)]
@@ -104,6 +105,9 @@ class Q_table():
                 rc = i
                 break
         
+        line_minmax = [0, 0]
+        odds = [o for o in range(self.actions) if o % 2 == 1]
+        print(odds)
         fig, axes = plt.subplots(nrows= rc, ncols=rc, sharex=True, sharey=True, figsize=[3*rc, 3*rc])
         
         q = len(self.quads)
@@ -120,7 +124,12 @@ class Q_table():
                         f -= len(styles)  # there is probably a better way to do this...intertools.cycle?
                     fmt = '--{}'.format(styles[f])
                     axes[r, c].plot(self.table[key], fmt, label=self.ranges[l])
-                    axes[r,c].set_title(self.quads[q])
+                    line_minmax[0] = line_minmax[0] if line_minmax[0] <= min(self.table[key]) else min(self.table[key])
+                    line_minmax[1] = line_minmax[1] if line_minmax[1] >= max(self.table[key]) else max(self.table[key])
+                axes[r,c].set_title(self.quads[q])
+                for o in odds:
+                    axes[r, c].plot([o, o], line_minmax, 'r--')
+                line_minmax = [0, 0]
         
         axes[0, rc-1].legend()
         plt.xlabel('Action')
