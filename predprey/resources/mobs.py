@@ -64,7 +64,7 @@ class Q_table():
         angle_keys = [None] + list(range(len(self.quads)))
         range_keys = [None] + list(range(len(self.ranges)))
         
-        table = {((ta, tr), (fa, fr)): [np.random.uniform(-actions, 0) for i in range(actions)] for ta in angle_keys for tr in range_keys for fa in angle_keys for fr in range_keys}  # (t)arget, (f)lee
+        table = {((ta, tr), (fa, fr)): [np.random.uniform(-actions, 0) for i in range(actions-1)] + [0] for ta in angle_keys for tr in range_keys for fa in angle_keys for fr in range_keys}  # (t)arget, (f)lee; random action starts at 0
         
         return table
     
@@ -107,7 +107,6 @@ class Q_table():
         
         line_minmax = [0, 0]
         odds = [o for o in range(self.actions) if o % 2 == 1]
-        print(odds)
         fig, axes = plt.subplots(nrows= rc, ncols=rc, sharex=True, sharey=True, figsize=[3*rc, 3*rc])
         
         q = len(self.quads)
@@ -155,12 +154,6 @@ class Mob():
         self.y = y
         self.health_init = 0
         self.health = self.health_init
-        
-        if dims and isinstance(dims, (list, tuple)):
-            self.max_x = dims[0]
-            self.max_y = dims[1]
-        else:
-            raise ValueError('No app dimensions passed to mob!')
         
         self.alive = True
         self.serial = int(time.time() * 10**6) % (10**7)
@@ -244,7 +237,7 @@ class Mob():
 
         return q_key
 
-    def action(self, epsilon=0, q_key=None):
+    def action(self, epsilon=0, q_key=None, max_dims=(0, 0)):
         #t = []
         #r = []
         
@@ -289,27 +282,27 @@ class Mob():
             dx *= self.speed[0]
             dy *= self.speed[0]
             
-        mx, my = self.move(dx=dx, dy=dy, run=run)
+        mx, my = self.move(dx=dx, dy=dy, run=run, max_dims=max_dims)
         return mx, my, choice  #, t, r
         
-    def move(self, dx=None, dy=None, run=False):
-        dx = dx if isinstance(dx, int) else random.randint(0, self.speed[1])
-        dy = dy if isinstance(dy, int) else random.randint(0, self.speed[1])
+    def move(self, dx=None, dy=None, run=False, max_dims=(0, 0)):
+        dx = dx if isinstance(dx, (int, float)) else random.randint(0, self.speed[1])
+        dy = dy if isinstance(dy, (int, float)) else random.randint(0, self.speed[1])
         
         ds = (dx ** 2 + dy ** 2) ** 0.5
         if ds != 0:
             scale = self.speed[1] / ds if run else self.speed[0] / ds
         else:
             scale = 0
-        
         mx = round(dx * scale, 2)
+        my = round(dy * scale, 2)
+
         mx = 0 - self.x if self.x + mx < 0 else mx  # left bound
-        mx = self.max_x - self.x if self.max_x < self.x + mx else mx  # right bound
+        mx = max_dims[0] - self.x if max_dims[0] < self.x + mx else mx  # right bound
         self.x += mx
         
-        my = round(dy * scale, 2)
         my = 0 - self.y if self.y + my < 0 else my  # upper bound
-        my = self.max_y - self.y if self.max_y < self.y + my else my  # lower bound
+        my = max_dims[1] - self.y if max_dims[1] < self.y + my else my  # lower bound
         self.y += my
         
         self.moves.append((self.x, self.y))
@@ -403,14 +396,11 @@ class Mob():
 
 
 class Food(Mob):
-    def __init__(self, x=None, y=None, dims=None):
+    def __init__(self, x=None, y=None):
         if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
             raise ValueError('Food not passed position in init!')
-        if dims and isinstance(dims, (list, tuple)):
-            super().__init__(x=x, y=y, dims=dims)
-        else:
-            raise ValueError('No app dimensions passed to Food!')
-        
+        super().__init__(x=x, y=y)
+
         self.health_init = 9
         self.health = self.health_init
         self.color = (0, 255, 0)
@@ -429,13 +419,10 @@ class Food(Mob):
 class Prey(Mob):
     sight = 60
     
-    def __init__(self, x=None, y=None, dims=None, load=False):
+    def __init__(self, x=None, y=None, load=False):
         if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
             raise ValueError('Prey not passed position in init!')
-        if dims and isinstance(dims, (list, tuple)):
-            super().__init__(x=x, y=y, dims=dims)
-        else:
-            raise ValueError('No app dimensions passed to Prey!')
+        super().__init__(x=x, y=y)
         
         self.health_init = 25
         self.health = self.health_init
@@ -446,7 +433,7 @@ class Prey(Mob):
         #self.sight = 60
         self.bands = 4
         self.slices = 8
-        self.speed = (2, 6)  # wander, run
+        self.speed = (self.health_init ** 0.5, self.sight / 4)  # wander, run
         
         self.color = (0, 0, 255)
         self.show_moves = 100
@@ -463,13 +450,10 @@ class Prey(Mob):
 class Predator(Mob):
     sight = 100
     
-    def __init__(self, x=None, y=None, dims=None, load=False):
+    def __init__(self, x=None, y=None, load=False):
         if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
             raise ValueError('Predator not passed position in init!')
-        if dims and isinstance(dims, (list, tuple)):
-            super().__init__(x=x, y=y, dims=dims)
-        else:
-            raise ValueError('No app dimensions passed to Predator!')
+        super().__init__(x=x, y=y)
         
         self.health_init = 50
         self.health = self.health_init
@@ -479,7 +463,7 @@ class Predator(Mob):
         #self.sight = 200
         self.bands = 8
         self.slices = 16
-        self.speed = (4, 10)
+        self.speed = (self.health_init ** 0.5, self.sight / 4)
         
         self.color = (255, 0, 0)
         self.show_moves = True
@@ -500,9 +484,9 @@ class Predator(Mob):
             #self.log.write('{}\n'.format(self.q_table.table))
 
     
-    def action(self, epsilon=0, q_key=None):
+    def action(self, epsilon=0, q_key=None, max_dims=(0, 0)):
         # movement logging for debugging
-        mx, my, choice = super().action(epsilon=epsilon, q_key=q_key)  #t, r debug
+        mx, my, choice = super().action(epsilon=epsilon, q_key=q_key, max_dims=max_dims)  #t, r debug
         
         if self.log:
             self.log.write('choice: {:<2}  |  move: ({:>6}, {:>6})\n'.format(choice, round(mx, 2), round(my, 2)))

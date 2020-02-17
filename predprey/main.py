@@ -66,16 +66,15 @@ def init_mobs(food=0, prey=(0, False), pred=(0, False)):
             'Prey': [],
             'Predator': [],
            }
-    dims = (WIDTH, HEIGHT)  # can be reset during training
     
     for f in range(food):
-        mobs['Food'].append(Food(x=0, y=0, dims=dims))
+        mobs['Food'].append(Food(x=0, y=0))
     
     for p in range(prey[0]):
-        mobs['Prey'].append(Prey(x=0, y=0, dims=dims, load=prey[1]))
+        mobs['Prey'].append(Prey(x=0, y=0, load=prey[1]))
     
     for p in range(pred[0]):
-        mobs['Predator'].append(Predator(x=0, y=0, dims=dims, load=pred[1]))
+        mobs['Predator'].append(Predator(x=0, y=0, load=pred[1]))
     
     print('\n' + '='*60 + '\n')
     return mobs
@@ -165,7 +164,7 @@ def train(food=0, prey=(0, False), pred=0):
                     update_this = True if (allow_prey_movement and mob_type == 'Prey') or mob_type == 'Predator' else False
                     if mob.alive and update_this:
                         q_key = mob.observe(mobs=mobs)  # find the closest food/prey/predator
-                        mx, my, choice = mob.action(epsilon=epsilon, q_key=q_key)  # take an action
+                        mx, my, choice = mob.action(epsilon=epsilon, q_key=q_key, max_dims=(WIDTH, HEIGHT))  # take an action
                         reward, _ = mob.check(mobs=mobs, mx=mx, my=my)  # check to see what has happened
                         mob.update_q(mobs=mobs, q_key=q_key, choice=choice, reward=reward)  # learn from what mob did
         
@@ -228,7 +227,7 @@ def run(food=0, prey=0, pred=0):
                 for mob in mob_list:
                     if mob.alive:
                         q_key = mob.observe(mobs=mobs)  # find the closest food/prey/predator
-                        mx, my, choice = mob.action(epsilon=epsilon, q_key=q_key)  # take an action
+                        mx, my, choice = mob.action(epsilon=epsilon, q_key=q_key, max_dims=(WIDTH, HEIGHT))  # take an action
                         reward, _ = mob.check(mobs=mobs, mx=mx, my=my)  # check to see what has happened
                         mob.update_q(mobs=mobs, q_key=q_key, choice=choice, reward=reward)  # learn from what mob did
 
