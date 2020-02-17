@@ -12,8 +12,17 @@ import matplotlib.pyplot as plt
 
 from resources.mobs import Predator, Prey, Food
 
+''' TODO
+
+    condense/commonize training and running
+    multi-step future_q
+    moving average on reward plot 
+'''
+
 
 pygame.init()
+
+MODE='prey'
 
 # resources
 RES = 'resources'
@@ -266,7 +275,7 @@ def run(food=0, prey=0, pred=0):
 def main():
     parser = argparse.ArgumentParser(description='''Predator/Prey AI Trainer and Visualizer''')
 
-    parser.add_argument('-m', '--mode', help='training/execution mode for AI', default='prey')
+    parser.add_argument('-m', '--mode', help='training/execution mode for AI', default=MODE)
 
     # mob selection
     parser.add_argument('--pred', help='number of predator mobs', default=0)
