@@ -16,7 +16,7 @@ from resources.mobs import Predator, Prey, Food
 
     condense/commonize training and running
     multi-step future_q
-    moving average on reward plot 
+
 '''
 
 
@@ -50,6 +50,7 @@ SAVE_Q = True
 
 # plotting
 PLOTS = 'plots'
+M_AVG = 10
 
 # colors
 WHITE = (255, 255, 255)
@@ -119,13 +120,15 @@ def plot_rewards(mobs=None, rewards=None):
         if mob_type != 'Food':
             for mob in mob_list:
                 plt.plot(rewards[mob], label='{}:{}'.format(mob_type, mob.serial))
-    plt.xlabel('Episode')
-    plt.ylabel('Reward')
-    plt.legend()
-    fig_name = os.path.join(RES, PLOTS, '{}.png'.format(int(time.time())))
-    print('Saving episode rewards plot as {}'.format(fig_name))
-    plt.savefig(fig_name)
-    plt.close()
+                moving_avg = np.convolve(rewards[mob], np.ones((M_AVG,))/M_AVG, mode='valid')
+                plt.plot(moving_avg, label='moving average, {}'.format(SHOW))
+                plt.xlabel('Episode')
+                plt.ylabel('Reward')
+                plt.legend()
+                fig_name = os.path.join(RES, PLOTS, '{}-{}.png'.format(mob.__class__, mob.serial))
+                print('Saving episode rewards plot as {}'.format(fig_name))
+                plt.savefig(fig_name)
+                plt.close()
 
 
 def exit_sim():
@@ -289,6 +292,7 @@ def main():
     parser.set_defaults(save_q=False)
     parser.add_argument('--no-plot', help='don\'t plot episode rewards', dest='plot_rew', action='store_false')
     parser.set_defaults(plot_rew=True)
+    parser.add_argument('--mvg_avg', help='moving average history for plot', default=M_AVG)
 
     # training variables
     parser.add_argument('--episodes', help='number of training episodes', default=EPISODES)
@@ -310,6 +314,8 @@ def main():
     globals()['FRAMES'] = int(args.frames)
     globals()['EPSILON'] = float(args.epsilon)
     globals()['DECAY_RATE'] = float(args.decay)
+    
+    globals()['M_AVG'] = int(args.mvg_avg)
 
     if args.mode == 'pred':
         mobs, rewards = train(food=0, prey=(1, False), pred=1)  # train the predator Q table
