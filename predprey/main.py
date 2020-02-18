@@ -121,7 +121,7 @@ def plot_rewards(mobs=None, rewards=None):
             for mob in mob_list:
                 plt.plot(rewards[mob], label='{}:{}'.format(mob_type, mob.serial))
                 moving_avg = np.convolve(rewards[mob], np.ones((M_AVG,))/M_AVG, mode='valid')
-                plt.plot(moving_avg, label='moving average, {}'.format(SHOW))
+                plt.plot(moving_avg, label='moving average, {}'.format(M_AVG))
                 plt.xlabel('Episode')
                 plt.ylabel('Reward')
                 plt.legend()
@@ -146,7 +146,7 @@ def train(food=0, prey=(0, False), pred=0):
     allow_prey_movement = prey[1]
     valued_customer = 'Prey' if allow_prey_movement else 'Predator'
     
-    # set a sceen wize to just larger than the mob can see
+    # set the sceen size
     WIDTH = int(Prey.sight * 1.5) if pred == 0 else int(Predator.sight * 1.5)
     HEIGHT = WIDTH
     pygame.display.set_mode((WIDTH, HEIGHT))
