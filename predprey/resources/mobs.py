@@ -241,10 +241,8 @@ class Mob():
         #t = []
         #r = []
         
-        if random.random() > epsilon or True:  # FIXME remove True to allow learning
-            choice = random.randint(0,16)  # np.argmax
-            
-            #choice = np.argmax(self.q_table.table[q_key])  # FIXME
+        if random.random() > epsilon:
+            choice = np.argmax(self.q_table.table[q_key])
         else:
             choice = random.randint(0,16)
 

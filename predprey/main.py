@@ -36,8 +36,8 @@ clock = pygame.time.Clock()
 FPS = 30
 
 # Q learning variables [DEFAULTS]
-EPISODES = 100  # 22500  # with epsilon decay rate at 0.9998, this corresponds to <1% random moves
-SHOW = 100  # how often to visualize
+EPISODES = 1000  # 22500  # with epsilon decay rate at 0.9998, this corresponds to <1% random moves
+SHOW = 1000  # how often to visualize
 FRAMES = 100  # per episode
 EPSILON = 0.9  # random action threshhold
 DECAY_RATE = 0.9998  # espilon *= DECAY_RATE
@@ -50,7 +50,7 @@ SAVE_Q = True
 
 # plotting
 PLOTS = 'plots'
-M_AVG = 10
+M_AVG = 50
 
 # colors
 WHITE = (255, 255, 255)
@@ -289,7 +289,7 @@ def main():
     parser.add_argument('--q_pred', help='pre-generated predator Q table', default=False)
     parser.add_argument('--q_prey', help='pre-generated prey Q table', default=False)
     parser.add_argument('--save_q', help='save final Q tables', dest='save_q', action='store_true')
-    parser.set_defaults(save_q=False)
+    parser.set_defaults(save_q=SAVE_Q)
     parser.add_argument('--no-plot', help='don\'t plot episode rewards', dest='plot_rew', action='store_false')
     parser.set_defaults(plot_rew=True)
     parser.add_argument('--mvg_avg', help='moving average history for plot', default=M_AVG)
