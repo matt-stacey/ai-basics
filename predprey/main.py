@@ -16,7 +16,7 @@ from resources.mobs import Predator, Prey, Food
 
     condense/commonize training and running
     multi-step future_q
-
+    2 q_tables for mobs (1 for target, 1 for flee; prioritize flee for action)
 '''
 
 
@@ -44,8 +44,8 @@ DECAY_RATE = 0.9998  # espilon *= DECAY_RATE
 
 # load/save Q tables
 TABLES = 'q_tables'
-PREY_TABLE = False  # 'Prey-7965313.Q'
-PRED_TABLE = False  # 'Predator-8637585.Q'
+PREY_TABLE = False  # 'Prey-7965313'
+PRED_TABLE = False  # 'Predator-8637585'
 SAVE_Q = True
 
 # plotting
