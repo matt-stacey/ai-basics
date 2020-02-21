@@ -44,8 +44,8 @@ DECAY_RATE = 0.9998  # espilon *= DECAY_RATE
 
 # load/save Q tables
 TABLES = 'q_tables'
-PREY_TABLE = False  # os.path.join(RES, TABLES, 'Prey-7965313.Q')
-PRED_TABLE = False  # os.path.join(RES, TABLES, 'Predator-8637585.Q')
+PREY_TABLE = False  # 'Prey-7965313.Q'
+PRED_TABLE = False  # 'Predator-8637585.Q'
 SAVE_Q = True
 
 # plotting
@@ -289,6 +289,7 @@ def main():
     parser.add_argument('--q_pred', help='pre-generated predator Q table', default=False)
     parser.add_argument('--q_prey', help='pre-generated prey Q table', default=False)
     parser.add_argument('--save_q', help='save final Q tables', dest='save_q', action='store_true')
+    parser.add_argument('--no_q', help='save final Q tables', dest='save_q', action='store_false')
     parser.set_defaults(save_q=SAVE_Q)
     parser.add_argument('--no-plot', help='don\'t plot episode rewards', dest='plot_rew', action='store_false')
     parser.set_defaults(plot_rew=True)
