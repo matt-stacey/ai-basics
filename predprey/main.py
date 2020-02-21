@@ -36,8 +36,8 @@ clock = pygame.time.Clock()
 FPS = 30
 
 # Q learning variables [DEFAULTS]
-EPISODES = 1000  # 22500  # with epsilon decay rate at 0.9998, this corresponds to <1% random moves
-SHOW = 1000  # how often to visualize
+EPISODES = 10  # 22500  # with epsilon decay rate at 0.9998, this corresponds to <1% random moves
+SHOW = 1  # how often to visualize
 FRAMES = 100  # per episode
 EPSILON = 0.9  # random action threshhold
 DECAY_RATE = 0.9998  # espilon *= DECAY_RATE
@@ -90,6 +90,17 @@ def init_mobs(food=0, prey=(0, False), pred=(0, False)):
     return mobs
 
 
+def reset_mobs(mobs=None, center=None):
+    for mob_type, mob_list in mobs.items():
+        for mob in mob_list:
+            x = random.randint(0, WIDTH)
+            y = random.randint(0, HEIGHT)
+            if mob_type == center:
+                x = WIDTH / 2
+                y = HEIGHT / 2
+            mob.reset(x=x, y=y)
+
+
 def display_stats(episode, frame, mobs):
     font = pygame.font.SysFont(None, 32)
     
@@ -100,10 +111,19 @@ def display_stats(episode, frame, mobs):
         tally = 0
         total = len(mobs[key])
         for mob in mobs[key]:
-            tally = tally + 1 if mob.alive else tally  # FIXME add rewards (avg?)
+            tally = tally + 1 if mob.alive else tally
         message = '{}: {}/{}'.format(key, tally, total)
         text = font.render(message, True, WHITE)
         gameDisplay.blit(text,(0, (num+1)*40))
+
+
+def display_mobs(show_this=False, mobs=None):
+    if not show_this:
+        return
+    for mob_type, mob_list in mobs.items():
+        for mob in mob_list:
+            if mob.alive:
+                mob.display(gameDisplay)
 
 
 def episode_cleanup(episode, mobs, rewards):
@@ -113,6 +133,15 @@ def episode_cleanup(episode, mobs, rewards):
             for mob in mob_list:
                 print('{} {:>8}: {:<9} ({})'.format(mob.__class__, mob.serial, round(rewards[mob][episode], 3), mob.alive))
     print('\n' + '='*60 + '\n')
+
+
+def save_q_tables(save_enabled, mobs=None, which=('Prey', 'Predator')):
+    if save_enabled:
+        for mob_type in which:
+            for mob in mobs[mob_type]:
+                mob.q_table.save(os.path.join(RES, TABLES), mob_type, mob.serial)
+    else:
+        print('Q table saving disabled')
 
 
 def plot_rewards(mobs=None, rewards=None):
@@ -142,6 +171,7 @@ def exit_sim():
 
 
 def train(food=0, prey=(0, False), pred=0):
+    global WIDTH, HEIGHT
 
     allow_prey_movement = prey[1]
     valued_customer = 'Prey' if allow_prey_movement else 'Predator'
@@ -157,14 +187,7 @@ def train(food=0, prey=(0, False), pred=0):
         end_ep = False
         
         # reset all the mobs for this episode
-        for mob_type, mob_list in mobs.items():
-            for mob in mob_list:
-                x = random.randint(0, WIDTH)
-                y = random.randint(0, HEIGHT)
-                if mob_type == valued_customer:
-                    x = WIDTH / 2  # centered
-                    y = HEIGHT / 2
-                mob.reset(x=x, y=y)
+        reset_mobs(mobs=mobs, center=valued_customer)
         
         # run the episode
         for k in range(FRAMES):
@@ -184,12 +207,7 @@ def train(food=0, prey=(0, False), pred=0):
                     elif not mob.alive:
                         end_ep = True  # die when one of the mobs does
 
-            # display all mobs
-            if show_this:
-                for mob_type, mob_list in mobs.items():
-                    for mob in mob_list:
-                        if mob.alive:
-                            mob.display(gameDisplay)
+            display_mobs(show_this=show_this, mobs=mobs)
             
             # complete the render and wait to cycle
             display_stats(episode, k+1, mobs)
@@ -208,27 +226,21 @@ def train(food=0, prey=(0, False), pred=0):
         episode_cleanup(episode, mobs, rewards)
         epsilon *= DECAY_RATE
 
-    if SAVE_Q:
-        for mob in mobs[valued_customer]:
-            mob.q_table.save(os.path.join(RES, TABLES), valued_customer, mob.serial)
-    else:
-        print('Q table saving disabled')
+    save_q_tables(SAVE_Q, mobs=mobs, which=[valued_customer])
 
     return mobs, rewards
 
 
 def run(food=0, prey=0, pred=0):
+    global WIDTH, HEIGHT
+    
     mobs, epsilon, rewards = sim_init(food=food, prey=prey, pred=pred)
     
     for episode in range(EPISODES):
         show_this = True if episode % SHOW == 0 else False
         
         # reset all the mobs for this episode
-        for mob_type, mob_list in mobs.items():
-            for mob in mob_list:
-                x = random.randint(0, WIDTH)
-                y = random.randint(0, HEIGHT)
-                mob.reset(x=x, y=y)
+        reset_mobs(mobs=mobs)
         
         # run the episode
         for k in range(FRAMES):
@@ -245,12 +257,7 @@ def run(food=0, prey=0, pred=0):
 
                         rewards[mob][episode] += (reward[0] + reward[1])  # tally for episode rewards
 
-            # display all mobs
-            if show_this:
-                for mob_type, mob_list in mobs.items():
-                    for mob in mob_list:
-                        if mob.alive:
-                            mob.display(gameDisplay)
+            display_mobs(show_this=show_this, mobs=mobs)
             
             # complete the render and wait to cycle
             display_stats(episode, k+1, mobs)
@@ -264,13 +271,7 @@ def run(food=0, prey=0, pred=0):
         episode_cleanup(episode, mobs, rewards)
         epsilon *= DECAY_RATE
 
-    if SAVE_Q:
-        for mob_type, mob_list in mobs.items():
-            if mob_type != 'Food':
-                for mob in mob_list:
-                    mob.q_table.save(os.path.join(RES, TABLES), mob_type, mob.serial)
-    else:
-        print('Q table saving disabled')
+    save_q_tables(SAVE_Q, mobs=mobs)
 
     return mobs, rewards
 
