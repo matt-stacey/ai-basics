@@ -16,7 +16,7 @@ from resources.mobs import Predator, Prey, Food
 
     condense/commonize training and running
     multi-step future_q
-
+    2 q_tables for mobs (1 for target, 1 for flee; prioritize flee for action)
 '''
 
 
@@ -44,8 +44,8 @@ DECAY_RATE = 0.9998  # espilon *= DECAY_RATE
 
 # load/save Q tables
 TABLES = 'q_tables'
-PREY_TABLE = False  # 'Prey-7965313.Q'
-PRED_TABLE = False  # 'Predator-8637585.Q'
+PREY_TABLE = False  # 'Prey-7965313'
+PRED_TABLE = False  # 'Predator-8637585'
 SAVE_Q = True
 
 # plotting
@@ -210,7 +210,8 @@ def train(food=0, prey=(0, False), pred=0):
 
     if SAVE_Q:
         for mob in mobs[valued_customer]:
-            mob.q_table.save(os.path.join(RES, TABLES), valued_customer, mob.serial)
+            for key in mob.q_table:
+                mob.q_table[key].save(os.path.join(RES, TABLES), valued_customer, mob.serial, key)
     else:
         print('Q table saving disabled')
 
@@ -268,7 +269,8 @@ def run(food=0, prey=0, pred=0):
         for mob_type, mob_list in mobs.items():
             if mob_type != 'Food':
                 for mob in mob_list:
-                    mob.q_table.save(os.path.join(RES, TABLES), mob_type, mob.serial)
+                    for key in mob.q_table:
+                        mob.q_table[key].save(os.path.join(RES, TABLES), mob_type, mob.serial, key)
     else:
         print('Q table saving disabled')
 
@@ -330,7 +332,8 @@ def main():
     exit_sim()
     for mob_type in ('Prey', 'Predator'):  # 'Food' has no q_table
         for mob in mobs[mob_type]:
-            mob.q_table.plot_q(os.path.join(RES, PLOTS, '{}_Q.png'.format(mob.serial)))  # moving out of game loop removed seg fault
+            for key in mob.q_table:
+                mob.q_table.plot_q(key, os.path.join(RES, PLOTS, '{}_{}_Q.png'.format(mob.serial, key)))  # moving out of game loop removed seg fault
 
     if args.plot_rew:
         plot_rewards(mobs=mobs, rewards=rewards)
