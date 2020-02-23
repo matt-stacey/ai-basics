@@ -36,8 +36,8 @@ clock = pygame.time.Clock()
 FPS = 30
 
 # Q learning variables [DEFAULTS]
-EPISODES = 10  # 22500  # with epsilon decay rate at 0.9998, this corresponds to <1% random moves
-SHOW = 100  # how often to visualize
+EPISODES = 1000  # 22500  # with epsilon decay rate at 0.9998, this corresponds to <1% random moves
+SHOW = 1000  # how often to visualize
 FRAMES = 100  # per episode
 EPSILON = 0.9  # random action threshhold
 DECAY_RATE = 0.9998  # espilon *= DECAY_RATE
@@ -46,11 +46,11 @@ DECAY_RATE = 0.9998  # espilon *= DECAY_RATE
 TABLES = 'q_tables'
 PREY_TABLE = False  # 'Prey-7965313'
 PRED_TABLE = False  # 'Predator-8637585'
-SAVE_Q = False
+SAVE_Q = True
 
 # plotting
 PLOTS = 'plots'
-M_AVG = 10
+M_AVG = 50
 
 # colors
 WHITE = (255, 255, 255)
