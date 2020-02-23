@@ -304,12 +304,12 @@ def main():
     # load/save mob q_tables
     parser.add_argument('--q_pred', help='pre-generated predator Q table', default=False)
     parser.add_argument('--q_prey', help='pre-generated prey Q table', default=False)
-    parser.add_argument('--save_q', help='save final Q tables', dest='save_q', action='store_true')
-    parser.add_argument('--no_q', help='save final Q tables', dest='save_q', action='store_false')
+    parser.add_argument('--save-q', help='save final Q tables', dest='save_q', action='store_true')
+    parser.add_argument('--no-q', help='save final Q tables', dest='save_q', action='store_false')
     parser.set_defaults(save_q=SAVE_Q)
     parser.add_argument('--no-plot', help='don\'t plot episode rewards', dest='plot_rew', action='store_false')
     parser.set_defaults(plot_rew=True)
-    parser.add_argument('--mvg_avg', help='moving average history for plot', default=M_AVG)
+    parser.add_argument('--mvg-avg', help='moving average history for plot', default=M_AVG)
 
     # training variables
     parser.add_argument('--episodes', help='number of training episodes', default=EPISODES)
