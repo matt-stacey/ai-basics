@@ -118,10 +118,6 @@ def display_stats(episode, frame, mobs):
 
 
 def mob_update(mode='run', mobs=None, epsilon=0, rewards=None, episode=0, allow_prey_movement=True):
-    # update_this: true for run / true for pred, prey if allowed to move for train
-    # only run if update_this and alive
-    # end_ep out
-    # copy from training
     end_episode = False
     update_types = ('Food', 'Prey', 'Predator') if allow_prey_movement else ('Food', 'Predator')
     update_q_tables = ('Prey') if mode in ('prey', 'evade') else ('Predator') if mode in ('pred') else ('Prey', 'Predator')
