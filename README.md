@@ -1,2 +1,3 @@
 # ai-basics
-Basic AI code
+Basic AI projects:
+  predprey: Q-learning based predator/prey simulation

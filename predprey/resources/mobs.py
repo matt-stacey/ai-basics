@@ -127,7 +127,7 @@ class Q_table():
                     line_minmax[1] = line_minmax[1] if line_minmax[1] >= max(self.table[key]) else max(self.table[key])
                 axes[r,c].set_title(self.quads[q])
                 for o in odds:
-                    axes[r, c].plot([o, o], line_minmax, 'r--')
+                    axes[r, c].plot([o, o], line_minmax, 'r--', alpha=0.3)
                 line_minmax = [0, 0]
         
         axes[0, rc-1].legend()
