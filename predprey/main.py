@@ -90,6 +90,17 @@ def init_mobs(food=0, prey=(0, False), pred=(0, False)):
     return mobs
 
 
+def reset_mobs(mobs=None, center=None):
+    for mob_type, mob_list in mobs.items():
+        for mob in mob_list:
+            x = random.randint(0, WIDTH)
+            y = random.randint(0, HEIGHT)
+            if mob_type == center:
+                x = WIDTH / 2
+                y = HEIGHT / 2
+            mob.reset(x=x, y=y)
+
+
 def display_stats(episode, frame, mobs):
     font = pygame.font.SysFont(None, 32)
     
@@ -100,10 +111,41 @@ def display_stats(episode, frame, mobs):
         tally = 0
         total = len(mobs[key])
         for mob in mobs[key]:
-            tally = tally + 1 if mob.alive else tally  # FIXME add rewards (avg?)
+            tally = tally + 1 if mob.alive else tally
         message = '{}: {}/{}'.format(key, tally, total)
         text = font.render(message, True, WHITE)
         gameDisplay.blit(text,(0, (num+1)*40))
+
+
+def mob_update(mode='run', mobs=None, epsilon=0, rewards=None, episode=0, allow_prey_movement=True):
+    end_episode = False
+    update_types = ('Food', 'Prey', 'Predator') if allow_prey_movement else ('Food', 'Predator')
+    update_q_tables = ('Prey') if mode in ('prey', 'evade') else ('Predator') if mode in ('pred') else ('Prey', 'Predator')
+    
+    
+    for mob_type, mob_list in mobs.items():
+        for mob in mob_list:
+            if mob.alive and mob_type in update_types:
+                q_key = mob.observe(mobs=mobs)  # find the closest food/prey/predator
+                mx, my, choice = mob.action(epsilon=epsilon, q_key=q_key, max_dims=(WIDTH, HEIGHT))  # take an action
+                reward, _ = mob.check(mobs=mobs, mx=mx, my=my)  # check to see what has happened
+                if mob_type in update_q_tables:
+                    mob.update_q(mobs=mobs, q_key=q_key, choice=choice, reward=reward)  # learn from what mob did
+        
+                rewards[mob][episode] += (reward[0] + reward[1])  # tally for episode rewards
+            elif not mob.alive:
+                end_episode = True  # die when one of the mobs does
+    
+    return end_episode
+
+
+def display_mobs(show_this=False, mobs=None):
+    if not show_this:
+        return
+    for mob_type, mob_list in mobs.items():
+        for mob in mob_list:
+            if mob.alive:
+                mob.display(gameDisplay)
 
 
 def episode_cleanup(episode, mobs, rewards):
@@ -115,9 +157,28 @@ def episode_cleanup(episode, mobs, rewards):
     print('\n' + '='*60 + '\n')
 
 
-def plot_rewards(mobs=None, rewards=None):
+def save_q_tables(save_enabled, mobs=None, which=('Prey', 'Predator')):
+    if save_enabled:
+        for mob_type in which:
+            for mob in mobs[mob_type]:
+                mob.q_table.save(os.path.join(RES, TABLES), mob_type, mob.serial)
+    else:
+        print('Q table saving disabled')
+
+
+def plot_q_tables(mobs=None, valued_customer=None):
+    mobs_to_plot = [valued_customer] if valued_customer else ('Prey', 'Predator')
+    
+    for mob_type in mobs_to_plot:  # 'Food' has no q_table
+        for mob in mobs[mob_type]:
+            mob.q_table.plot_q(os.path.join(RES, PLOTS, '{}_Q.png'.format(mob.serial)))  # moving out of game loop removed seg fault
+
+
+def plot_rewards(mobs=None, rewards=None, valued_customer=None):
+    mobs_to_plot = [valued_customer] if valued_customer else ('Prey', 'Predator')
+    
     for mob_type, mob_list in mobs.items():
-        if mob_type != 'Food':
+        if mob_type in mobs_to_plot:
             for mob in mob_list:
                 plt.plot(rewards[mob], label='{}:{}'.format(mob_type, mob.serial))
                 moving_avg = np.convolve(rewards[mob], np.ones((M_AVG,))/M_AVG, mode='valid')
@@ -141,7 +202,8 @@ def exit_sim():
     pygame.quit()
 
 
-def train(food=0, prey=(0, False), pred=0):
+def train(mode='prey', food=0, prey=(0, False), pred=0):
+    global WIDTH, HEIGHT
 
     allow_prey_movement = prey[1]
     valued_customer = 'Prey' if allow_prey_movement else 'Predator'
@@ -157,39 +219,16 @@ def train(food=0, prey=(0, False), pred=0):
         end_ep = False
         
         # reset all the mobs for this episode
-        for mob_type, mob_list in mobs.items():
-            for mob in mob_list:
-                x = random.randint(0, WIDTH)
-                y = random.randint(0, HEIGHT)
-                if mob_type == valued_customer:
-                    x = WIDTH / 2  # centered
-                    y = HEIGHT / 2
-                mob.reset(x=x, y=y)
+        reset_mobs(mobs=mobs, center=valued_customer)
         
         # run the episode
         for k in range(FRAMES):
             gameDisplay.fill(BLACK)
             
             # update mobs
-            for mob_type, mob_list in mobs.items():
-                for mob in mob_list:
-                    update_this = True if (allow_prey_movement and mob_type == 'Prey') or mob_type == 'Predator' else False
-                    if mob.alive and update_this:
-                        q_key = mob.observe(mobs=mobs)  # find the closest food/prey/predator
-                        mx, my, choice = mob.action(epsilon=epsilon, q_key=q_key, max_dims=(WIDTH, HEIGHT))  # take an action
-                        reward, _ = mob.check(mobs=mobs, mx=mx, my=my)  # check to see what has happened
-                        mob.update_q(mobs=mobs, q_key=q_key, choice=choice, reward=reward)  # learn from what mob did
-        
-                        rewards[mob][episode] += (reward[0] + reward[1])  # tally for episode rewards
-                    elif not mob.alive:
-                        end_ep = True  # die when one of the mobs does
+            end_ep = mob_update(mode=mode, mobs=mobs, epsilon=epsilon, rewards=rewards, episode=episode, allow_prey_movement=allow_prey_movement)
 
-            # display all mobs
-            if show_this:
-                for mob_type, mob_list in mobs.items():
-                    for mob in mob_list:
-                        if mob.alive:
-                            mob.display(gameDisplay)
+            display_mobs(show_this=show_this, mobs=mobs)
             
             # complete the render and wait to cycle
             display_stats(episode, k+1, mobs)
@@ -208,49 +247,28 @@ def train(food=0, prey=(0, False), pred=0):
         episode_cleanup(episode, mobs, rewards)
         epsilon *= DECAY_RATE
 
-    if SAVE_Q:
-        for mob in mobs[valued_customer]:
-            mob.q_table.save(os.path.join(RES, TABLES), valued_customer, mob.serial)
-    else:
-        print('Q table saving disabled')
+    save_q_tables(SAVE_Q, mobs=mobs, which=[valued_customer])
 
-    return mobs, rewards
+    return mobs, rewards, valued_customer
 
 
-def run(food=0, prey=0, pred=0):
+def run(mode='run', food=0, prey=0, pred=0):
     mobs, epsilon, rewards = sim_init(food=food, prey=prey, pred=pred)
     
     for episode in range(EPISODES):
         show_this = True if episode % SHOW == 0 else False
         
         # reset all the mobs for this episode
-        for mob_type, mob_list in mobs.items():
-            for mob in mob_list:
-                x = random.randint(0, WIDTH)
-                y = random.randint(0, HEIGHT)
-                mob.reset(x=x, y=y)
+        reset_mobs(mobs=mobs)
         
         # run the episode
         for k in range(FRAMES):
             gameDisplay.fill(BLACK)
             
             # update all mobs
-            for mob_type, mob_list in mobs.items():
-                for mob in mob_list:
-                    if mob.alive:
-                        q_key = mob.observe(mobs=mobs)  # find the closest food/prey/predator
-                        mx, my, choice = mob.action(epsilon=epsilon, q_key=q_key, max_dims=(WIDTH, HEIGHT))  # take an action
-                        reward, _ = mob.check(mobs=mobs, mx=mx, my=my)  # check to see what has happened
-                        mob.update_q(mobs=mobs, q_key=q_key, choice=choice, reward=reward)  # learn from what mob did
-
-                        rewards[mob][episode] += (reward[0] + reward[1])  # tally for episode rewards
-
-            # display all mobs
-            if show_this:
-                for mob_type, mob_list in mobs.items():
-                    for mob in mob_list:
-                        if mob.alive:
-                            mob.display(gameDisplay)
+            mob_update(mode=mode, mobs=mobs, epsilon=epsilon, rewards=rewards, episode=episode)
+            
+            display_mobs(show_this=show_this, mobs=mobs)
             
             # complete the render and wait to cycle
             display_stats(episode, k+1, mobs)
@@ -264,13 +282,7 @@ def run(food=0, prey=0, pred=0):
         episode_cleanup(episode, mobs, rewards)
         epsilon *= DECAY_RATE
 
-    if SAVE_Q:
-        for mob_type, mob_list in mobs.items():
-            if mob_type != 'Food':
-                for mob in mob_list:
-                    mob.q_table.save(os.path.join(RES, TABLES), mob_type, mob.serial)
-    else:
-        print('Q table saving disabled')
+    save_q_tables(SAVE_Q, mobs=mobs)
 
     return mobs, rewards
 
@@ -305,6 +317,7 @@ def main():
     args = parser.parse_args()
     mobs = None
     rewards = None
+    valued_customer = False
 
     globals()['PREY_TABLE'] = False if not args.q_prey else os.path.join(RES, TABLES, args.q_prey)
     globals()['PRED_TABLE'] = False if not args.q_pred else os.path.join(RES, TABLES, args.q_pred)
@@ -319,21 +332,20 @@ def main():
     globals()['M_AVG'] = int(args.mvg_avg)
 
     if args.mode == 'pred':
-        mobs, rewards = train(food=0, prey=(1, False), pred=1)  # train the predator Q table
+        mobs, rewards, valued_customer = train(mode=args.mode, food=0, prey=(1, False), pred=1)  # train the predator Q table
     elif args.mode == 'prey':
-        mobs, rewards = train(food=1, prey=(1, True), pred=0)  # train the prey Q table (target)
+        mobs, rewards, valued_customer = train(mode=args.mode, food=1, prey=(1, True), pred=0)  # train the prey Q table (target)
     elif args.mode == 'evade':
-        mobs, rewards = train(food=0, prey=(1, True), pred=1)  # train the prey Q table (flee)
+        mobs, rewards, valued_customer = train(mode=args.mode, food=0, prey=(1, True), pred=1)  # train the prey Q table (flee)
     else:
         mobs, rewards = run(food=int(args.food), prey=int(args.prey), pred=int(args.pred))
 
     exit_sim()
-    for mob_type in ('Prey', 'Predator'):  # 'Food' has no q_table
-        for mob in mobs[mob_type]:
-            mob.q_table.plot_q(os.path.join(RES, PLOTS, '{}_Q.png'.format(mob.serial)))  # moving out of game loop removed seg fault
+    
+    plot_q_tables(mobs=mobs, valued_customer=valued_customer)
 
     if args.plot_rew:
-        plot_rewards(mobs=mobs, rewards=rewards)
+        plot_rewards(mobs=mobs, rewards=rewards, valued_customer=valued_customer)
 
 
 if __name__ == '__main__':
