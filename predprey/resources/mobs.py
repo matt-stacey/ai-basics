@@ -60,11 +60,11 @@ class Q_table():
     def q_table_setup(self, actions=1):
         table = {}
         
-        # keys will be tuples of "quadrants" and range bands, which are stored as [L, R) angles and [min, max) distance respectively, for both a target and whatever is being fleed
+        # keys will be tuples of "quadrants" and range bands, which are stored as [L, R) angles and [min, max) distance respectively
         angle_keys = [None] + list(range(len(self.quads)))
         range_keys = [None] + list(range(len(self.ranges)))
         
-        table = {((ta, tr), (fa, fr)): [np.random.uniform(-actions, 0) for i in range(actions-1)] + [0] for ta in angle_keys for tr in range_keys for fa in angle_keys for fr in range_keys}  # (t)arget, (f)lee; random action starts at 0
+        table = {(a, r): [np.random.uniform(-actions, 0) for i in range(actions-1)] + [0] for a in angle_keys for r in range_keys}  # random action starts at 0
         
         return table
     
@@ -92,7 +92,7 @@ class Q_table():
             low, high = key
             if low <= r < high:
                 return num
-                
+        
         return None
 
     def plot_q(self, filename, tgt=True):
@@ -134,11 +134,11 @@ class Q_table():
         plt.xlabel('Action')
         plt.ylabel('q_value')
         
-        plt.savefig(filename)  # needs to invlude directory structure
+        plt.savefig(filename)  # needs to include directory structure
         plt.close()
     
-    def save(self, directory, mob_type, serial):
-        filename = '{}/{}-{}.Q'.format(directory, mob_type, serial)
+    def save(self, directory, mob_type, serial, key):
+        filename = '{}/{}-{}-{}.Q'.format(directory, mob_type, serial, key)
         print('Saving Q table as {}'.format(filename))
         with open(filename, 'wb') as f:  # microseconds
             pickle.dump(self.table, f)
@@ -172,7 +172,7 @@ class Mob():
         self.learning_rate = 0  # 0: no learning, 1: no memory
         self.discount = 0  # 0: no time preference, 1: infinite time preference
         
-        self.q_table = None
+        self.q_table = {'target': None, 'flee': None}
         
     def __str__(self):
         return '{} at ({}, {})'.format(self.__class__, self.x, self.y)
@@ -307,7 +307,6 @@ class Mob():
         return mx, my
         
     def check(self, mobs=None, mx=0, my=0):
-        FACTOR = 1
         move_reward = -1  # turn penalty
         move_reward -= (mx**2 + my**2) ** 0.5  # move penalty
         act_reward = 0
@@ -321,7 +320,7 @@ class Mob():
                     if mob.alive and ds < (self.r + mob.r):
                         # eat the prey/food, be rewarded
                         self.health += mob.health
-                        act_reward += (mob.health_init * FACTOR)
+                        act_reward += mob.health_init
                         self.target[1] = None
                         mob.health = 0
                         mob.alive = False
@@ -331,7 +330,7 @@ class Mob():
                     ds = distance(mob - self)
                     if mob.alive and ds < (self.r + mob.r):
                         # pentalty for being eaten
-                        act_reward -= (self.health_init * FACTOR)
+                        act_reward -= self.health_init
         
         reward = (move_reward, act_reward)
         return reward, eaten_mobs
@@ -441,9 +440,11 @@ class Prey(Mob):
         self.discount = 0.67
         
         if not load:
-            self.q_table = Q_table(r=self.sight, bands=self.bands, slices=self.slices)
+            for key in self.q_table:
+                self.q_table[key] = Q_table(r=self.sight, bands=self.bands, slices=self.slices)
         else:
-            self.q_table = Q_table(r=self.sight, bands=self.bands, slices=self.slices, load=load)
+            for key in self.q_table:
+                self.q_table[key] = Q_table(r=self.sight, bands=self.bands, slices=self.slices, load=load)
 
 
 class Predator(Mob):
@@ -468,19 +469,19 @@ class Predator(Mob):
         self.show_moves = True
         
         self.learning_rate = 0.12  # faster learner
-        self.discount = 0.95  # with better time pref than prey
+        self.discount = 0.9  # with better time pref than prey
         
         if not load:
-            self.q_table = Q_table(r=self.sight, bands=self.bands, slices=self.slices)
+            self.q_table['target'] = Q_table(r=self.sight, bands=self.bands, slices=self.slices)
         else:
-            self.q_table = Q_table(r=self.sight, bands=self.bands, slices=self.slices, load=load)
+            self.q_table['target'] = Q_table(r=self.sight, bands=self.bands, slices=self.slices, load=load)
         
         self.log = False  # open('resources/pred.log', 'w')
         if self.log:
             self.log.write('{}, {}\n'.format(self.__class__, self.serial))
-            #self.log.write('{}\n'.format(self.q_table.table.keys()))
-            self.log.write('{}\n{}\n'.format(self.q_table.quads, self.q_table.ranges))
-            #self.log.write('{}\n'.format(self.q_table.table))
+            #self.log.write('{}\n'.format(self.q_table['target'].table.keys()))
+            self.log.write('{}\n{}\n'.format(self.q_table['target'].quads, self.q_table['target'].ranges))
+            #self.log.write('{}\n'.format(self.q_table['target'].table))
 
     
     def action(self, epsilon=0, q_key=None, max_dims=(0, 0)):

@@ -341,9 +341,8 @@ def main():
         mobs, rewards = run(food=int(args.food), prey=int(args.prey), pred=int(args.pred))
 
     exit_sim()
-    
-    plot_q_tables(mobs=mobs, valued_customer=valued_customer)
 
+    plot_q_tables(mobs=mobs, valued_customer=valued_customer)
     if args.plot_rew:
         plot_rewards(mobs=mobs, rewards=rewards, valued_customer=valued_customer)
 
