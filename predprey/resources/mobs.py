@@ -337,6 +337,7 @@ class Mob():
         return reward, eaten_mobs
 
     def update_q(self, mobs=None, q_key=((None, None), (None, None)), choice=-1, reward=0):
+        # make recursive based on subsequent repeats of same action, or best action?
         current_q = self.q_table.table[q_key][choice]
 
         new_q_key = self.observe(mobs=mobs)  # sentdex for advice
