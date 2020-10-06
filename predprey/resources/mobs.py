@@ -96,8 +96,9 @@ class Q_table():
         return None
 
     def plot_q(self, filename, tgt=True):
-        # one plot for each quad; one line for each range band
-        # x_axis: action, y-axis: q_value
+        # plot: rows for range, cols for quad (where tgt is) plus 1 for None
+        # subplot: x/choice, y/q value
+        # lines: based on flee location, 9 total (None, short/long for fwd/back/L/R)
         print('Plotting Q table {}'.format(filename))
         rc = len(self.quads)
         for i in range(1,20):
